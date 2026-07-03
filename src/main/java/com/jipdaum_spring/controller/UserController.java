@@ -1,7 +1,7 @@
 package com.jipdaum_spring.controller;
 
-import com.jipdaum_spring.domain.User.User;
-import com.jipdaum_spring.domain.User.UserRepository;
+import com.jipdaum_spring.domain.springuser.User;
+import com.jipdaum_spring.domain.springuser.UserRepository;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -54,8 +54,15 @@ public class UserController {
         }
 
         String token = bearerToken.substring(7);
-        if (!jwtTokenProvider.validate(token)) {
-            return ResponseEntity.status(401).body("Invalid token");
+        if (JwtTokenProvider.TYPE_REFRESH.equals(jwtTokenProvider.getType(token))) {
+            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
+        }
+        JwtTokenProvider.TokenStatus status = jwtTokenProvider.validateToken(token);
+        if (status == JwtTokenProvider.TokenStatus.EXPIRED) {
+            return ResponseEntity.status(401).body(Map.of("code", "TOKEN_EXPIRED", "message", "액세스 토큰이 만료되었습니다."));
+        }
+        if (status != JwtTokenProvider.TokenStatus.VALID) {
+            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
         }
 
         String email = jwtTokenProvider.getEmail(token);

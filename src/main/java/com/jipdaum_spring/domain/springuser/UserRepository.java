@@ -1,4 +1,4 @@
-package com.jipdaum_spring.domain.User;
+package com.jipdaum_spring.domain.springuser;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

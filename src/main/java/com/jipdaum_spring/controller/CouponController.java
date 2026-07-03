@@ -1,11 +1,11 @@
 package com.jipdaum_spring.controller;
 
+import com.jipdaum_spring.dto.coupon.ValidateCouponRequest;
 import com.jipdaum_spring.service.CouponService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/shop/coupons")
@@ -20,7 +20,7 @@ public class CouponController {
     }
 
     @PostMapping("/validate")
-    public ResponseEntity<?> validateCoupon(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(couponService.validateCoupon(body));
+    public ResponseEntity<?> validateCoupon(@Valid @RequestBody ValidateCouponRequest request) {
+        return ResponseEntity.ok(couponService.validateCoupon(request));
     }
 }

@@ -1,6 +1,6 @@
 package com.jipdaum_spring.domain.coupon;
 
-import com.jipdaum_spring.domain.user.JipdaumUser;
+import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
