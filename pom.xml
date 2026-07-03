@@ -144,6 +144,21 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Mockito(ByteBuddy)가 아직 최신 JDK의 클래스 파일 버전을 공식 지원하지 않는 경우를 위한 호환 옵션.
+					     지원 JDK에서는 아무 영향이 없다. -->
+					<argLine>-Dnet.bytebuddy.experimental=true</argLine>
+				</configuration>
+			</plugin>
+			<plugin>
+				<!-- 알려진 CVE가 있는 의존성을 검사한다: mvn org.owasp:dependency-check-maven:check -->
+				<groupId>org.owasp</groupId>
+				<artifactId>dependency-check-maven</artifactId>
+				<version>12.1.0</version>
+			</plugin>
 		</plugins>
 	</build>
 

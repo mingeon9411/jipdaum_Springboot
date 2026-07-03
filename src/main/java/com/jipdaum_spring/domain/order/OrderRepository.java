@@ -1,6 +1,6 @@
 package com.jipdaum_spring.domain.order;
 
-import com.jipdaum_spring.domain.user.JipdaumUser;
+import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

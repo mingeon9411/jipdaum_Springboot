@@ -6,16 +6,21 @@ import com.jipdaum_spring.domain.product.Product;
 import com.jipdaum_spring.domain.product.ProductOption;
 import com.jipdaum_spring.domain.product.ProductOptionRepository;
 import com.jipdaum_spring.domain.product.ProductRepository;
-import com.jipdaum_spring.domain.user.JipdaumUser;
-import com.jipdaum_spring.domain.user.JipdaumUserRepository;
+import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
+import com.jipdaum_spring.dto.cart.AddToCartRequest;
+import com.jipdaum_spring.dto.cart.CartItemResponse;
+import com.jipdaum_spring.dto.cart.CartMutationResult;
+import com.jipdaum_spring.dto.cart.DeleteCartRequest;
+import com.jipdaum_spring.dto.cart.UpdateCartRequest;
+import com.jipdaum_spring.security.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,56 +29,28 @@ public class CartService {
     private final CartRepository cartRepository;
     private final ProductRepository productRepository;
     private final ProductOptionRepository productOptionRepository;
-    private final JipdaumUserRepository jipdaumUserRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     private JipdaumUser getCurrentUser() {
-        String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Optional<JipdaumUser> byEmail = jipdaumUserRepository.findByEmail(email);
-        // principal에 @가 없으면 Spring Boot 형식 → Django 유저(이메일에 @ 포함)를 우선 탐색
-        if (!email.contains("@")) {
-            Optional<JipdaumUser> djangoUser = jipdaumUserRepository.findAllByUsernameIgnoreCase(email)
-                    .stream()
-                    .filter(u -> u.getEmail() != null && u.getEmail().contains("@"))
-                    .findFirst();
-            if (djangoUser.isPresent()) return djangoUser.get();
-        }
-        return byEmail.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다."));
+        return currentUserProvider.getCurrentUser();
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getCart() {
+    public List<CartItemResponse> getCart() {
         JipdaumUser user = getCurrentUser();
-        return cartRepository.findByUser(user).stream().map(item -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", item.getId());
-            m.put("product_id", item.getProduct().getId());
-            m.put("product_name", item.getProduct().getName());
-            m.put("price", item.getProduct().getBasePrice());
-            m.put("image", item.getProduct().getThumbnailUrl());
-            m.put("option_id", item.getOption() != null ? item.getOption().getId() : null);
-            m.put("option_name", item.getOption() != null
-                    ? item.getOption().getOptionName() + ": " + item.getOption().getOptionValue()
-                    : null);
-            m.put("quantity", item.getQuantity());
-            return (Map<String, Object>) m;
-        }).toList();
+        return cartRepository.findByUser(user).stream().map(CartItemResponse::from).toList();
     }
 
     @Transactional
-    public Map<String, Object> addToCart(Map<String, Object> body) {
+    public CartMutationResult addToCart(AddToCartRequest request) {
         JipdaumUser user = getCurrentUser();
-        Long productId = Long.parseLong(body.get("product").toString());
-        Object optionRaw = body.get("option") != null ? body.get("option") : body.get("product_option");
-        Long optionId = optionRaw != null ? Long.parseLong(optionRaw.toString()) : null;
-        int quantity = Integer.parseInt(body.getOrDefault("quantity", 1).toString());
+        int quantity = request.quantityOrDefault();
 
-        if (quantity < 1)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수량은 1개 이상이어야 합니다.");
-
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        ProductOption option = optionId != null
-                ? productOptionRepository.findById(optionId).orElseThrow()
+        Product product = productRepository.findById(request.product())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        ProductOption option = request.option() != null
+                ? productOptionRepository.findById(request.option())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "옵션을 찾을 수 없습니다."))
                 : null;
 
         Optional<Cart> existing = cartRepository.findByUserAndProductAndOption(user, product, option);
@@ -81,35 +58,27 @@ public class CartService {
             Cart cart = existing.get();
             cart.setQuantity(cart.getQuantity() + quantity);
             cartRepository.save(cart);
-            return Map.of("message", "장바구니 수량이 추가되었습니다.");
+            return new CartMutationResult("장바구니 수량이 추가되었습니다.", false);
         }
 
         cartRepository.save(Cart.builder().user(user).product(product).option(option).quantity(quantity).build());
-        return Map.of("message", "장바구니에 담겼습니다.");
+        return new CartMutationResult("장바구니에 담겼습니다.", true);
     }
 
     @Transactional
-    public Map<String, Object> updateCart(Map<String, Object> body) {
+    public void updateCart(UpdateCartRequest request) {
         JipdaumUser user = getCurrentUser();
-        Long itemId = Long.parseLong(body.get("item_id").toString());
-        int quantity = Integer.parseInt(body.get("quantity").toString());
-
-        if (quantity < 1)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수량은 1개 이상이어야 합니다.");
-
-        Cart cart = cartRepository.findByIdAndUser(itemId, user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        cart.setQuantity(quantity);
+        Cart cart = cartRepository.findByIdAndUser(request.itemId(), user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."));
+        cart.setQuantity(request.quantity());
         cartRepository.save(cart);
-        return Map.of("message", "수량이 수정되었습니다.");
     }
 
     @Transactional
-    public void deleteCart(Map<String, Object> body) {
+    public void deleteCart(DeleteCartRequest request) {
         JipdaumUser user = getCurrentUser();
-        Long itemId = Long.parseLong(body.get("item_id").toString());
-        Cart cart = cartRepository.findByIdAndUser(itemId, user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Cart cart = cartRepository.findByIdAndUser(request.itemId(), user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."));
         cartRepository.delete(cart);
     }
 }

@@ -1,11 +1,11 @@
 package com.jipdaum_spring.controller;
 
+import com.jipdaum_spring.dto.product.CreateReviewRequest;
 import com.jipdaum_spring.service.ProductService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/shop/products")
@@ -33,7 +33,7 @@ public class ProductController {
     }
 
     @PostMapping("/{id}/reviews")
-    public ResponseEntity<?> createReview(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return ResponseEntity.status(201).body(productService.createReview(id, body));
+    public ResponseEntity<?> createReview(@PathVariable Long id, @Valid @RequestBody CreateReviewRequest request) {
+        return ResponseEntity.status(201).body(productService.createReview(id, request));
     }
 }

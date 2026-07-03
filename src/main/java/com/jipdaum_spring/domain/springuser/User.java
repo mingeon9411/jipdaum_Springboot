@@ -1,4 +1,4 @@
-package com.jipdaum_spring.domain.User;
+package com.jipdaum_spring.domain.springuser;
 
 import jakarta.persistence.*;
 import lombok.Builder;
