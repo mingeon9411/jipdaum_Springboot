@@ -32,6 +32,7 @@ public class CouponService {
     public List<MyCouponResponse> getMyCoupons() {
         JipdaumUser user = getCurrentUser();
         return userCouponRepository.findByUserAndIsUsedFalse(user).stream()
+                .filter(uc -> uc.getCoupon().isValid())
                 .map(MyCouponResponse::from)
                 .toList();
     }
@@ -48,6 +49,9 @@ public class CouponService {
             return ValidateCouponResponse.invalid("유효하지 않은 쿠폰입니다.");
         if (!coupon.isValid())
             return ValidateCouponResponse.invalid("사용할 수 없는 쿠폰입니다.");
+        if (coupon.getMinOrderAmount() != null && request.orderAmount() < coupon.getMinOrderAmount())
+            return ValidateCouponResponse.invalid(
+                    "최소 주문 금액 " + String.format("%,d", coupon.getMinOrderAmount()) + "원 이상 시 사용 가능합니다.");
 
         return ValidateCouponResponse.valid(coupon.calcDiscount(request.orderAmount()), coupon.getName());
     }

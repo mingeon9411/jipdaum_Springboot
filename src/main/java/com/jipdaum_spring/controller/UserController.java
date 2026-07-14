@@ -1,5 +1,7 @@
 package com.jipdaum_spring.controller;
 
+import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
+import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
 import com.jipdaum_spring.domain.springuser.User;
 import com.jipdaum_spring.domain.springuser.UserRepository;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
@@ -20,6 +22,7 @@ public class UserController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final JipdaumUserRepository jipdaumUserRepository;
 
     @GetMapping
     public ResponseEntity<?> getAllUsers() {
@@ -66,18 +69,33 @@ public class UserController {
         }
 
         String email = jwtTokenProvider.getEmail(token);
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(404).body("User not found");
+
+        // Django SimpleJWT: sub 없이 user_id 클레임 사용
+        if (email == null) {
+            Long userId = jwtTokenProvider.getUserId(token);
+            if (userId != null) {
+                email = jipdaumUserRepository.findById(userId).map(JipdaumUser::getEmail).orElse(null);
+            }
+        }
+        if (email == null) {
+            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
         }
 
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "email", user.getEmail(),
-                "name", user.getName(),
-                "nickname", user.getName() != null ? user.getName() : "",
-                "profileImage", user.getProfileImage() != null ? user.getProfileImage() : "",
-                "provider", user.getProvider()
-        ));
+        // JIPDAUM_USER(Django와 공유하는 테이블)가 실제 nickname의 source of truth.
+        // Spring 자체 users 테이블은 소셜 로그인 부가 정보(프로필 이미지 등)만 보조로 사용한다.
+        JipdaumUser jipdaumUser = jipdaumUserRepository.findByEmail(email).orElse(null);
+        if (jipdaumUser == null) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+        User springUser = userRepository.findByEmail(email).orElse(null);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", jipdaumUser.getId());
+        body.put("email", jipdaumUser.getEmail());
+        body.put("name", jipdaumUser.getNickname());
+        body.put("nickname", jipdaumUser.getNickname());
+        body.put("profileImage", springUser != null && springUser.getProfileImage() != null ? springUser.getProfileImage() : "");
+        body.put("provider", springUser != null ? springUser.getProvider() : "");
+        return ResponseEntity.ok(body);
     }
 }

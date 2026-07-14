@@ -14,6 +14,11 @@ public class ProductController {
 
     private final ProductService productService;
 
+    @GetMapping("/categories")
+    public ResponseEntity<?> listCategories() {
+        return ResponseEntity.ok(productService.getCategories());
+    }
+
     @GetMapping
     public ResponseEntity<?> listProducts(
             @RequestParam(required = false) String search,
