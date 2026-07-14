@@ -2,6 +2,7 @@ package com.jipdaum_spring.service;
 
 import com.jipdaum_spring.domain.product.*;
 import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
+import com.jipdaum_spring.dto.product.CategoryResponse;
 import com.jipdaum_spring.dto.product.CreateReviewRequest;
 import com.jipdaum_spring.dto.product.CreateReviewResponse;
 import com.jipdaum_spring.dto.product.ProductDetailResponse;
@@ -25,7 +26,14 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ReviewRepository reviewRepository;
+    private final CategoryRepository categoryRepository;
     private final CurrentUserProvider currentUserProvider;
+
+    public List<CategoryResponse> getCategories() {
+        return categoryRepository.findByParentIsNull().stream()
+                .map(CategoryResponse::from)
+                .toList();
+    }
 
     public List<ProductDetailResponse> getProducts(String search, Long categoryId) {
         List<Product> products;
