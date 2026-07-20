@@ -93,6 +93,15 @@ public class JwtTokenProvider {
         try { return Long.parseLong(userId.toString()); } catch (NumberFormatException e) { return null; }
     }
 
+    public Date getExpiration(String token) {
+        try {
+            return Jwts.parser().verifyWith(getSigningKey()).build()
+                    .parseSignedClaims(token).getPayload().getExpiration();
+        } catch (ExpiredJwtException e) {
+            return e.getClaims().getExpiration();
+        }
+    }
+
     public boolean validate(String token) {
         return validateToken(token) == TokenStatus.VALID;
     }

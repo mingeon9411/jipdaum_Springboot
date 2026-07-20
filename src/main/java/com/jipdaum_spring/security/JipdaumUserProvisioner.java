@@ -30,25 +30,31 @@ public class JipdaumUserProvisioner {
         }
 
         try {
-            insert(usernameHint, email, nickname);
+            insert(usernameHint, "!" + usernameHint, email, nickname, false);
         } catch (DataAccessException e) {
             // username unique 제약 충돌 시 suffix를 붙여 한 번 더 시도한다.
             String fallbackUsername = usernameHint + "_" + (System.currentTimeMillis() % 10000);
             try {
-                insert(fallbackUsername, email, nickname);
+                insert(fallbackUsername, "!" + fallbackUsername, email, nickname, false);
             } catch (DataAccessException retryFailure) {
                 log.warn("JIPDAUM_USER 자동 생성 실패 (email={})", email, retryFailure);
             }
         }
     }
 
-    private void insert(String username, String email, String nickname) {
+    /** 이메일/비밀번호 회원가입으로 JIPDAUM_USER 행을 생성한다. 가입 자체가 이메일 인증으로 간주되어 is_email_verified=1로 만든다. */
+    @Transactional
+    public void createLocalUser(String username, String passwordHash, String email, String nickname) {
+        insert(username, passwordHash, email, nickname, true);
+    }
+
+    private void insert(String username, String passwordColumnValue, String email, String nickname, boolean emailVerified) {
         jdbcTemplate.update(
             "INSERT INTO JIPDAUM_USER " +
             "(username, password, last_login, is_superuser, first_name, last_name, " +
             "email, is_staff, is_active, created_at, nickname, is_email_verified) " +
-            "VALUES (?, ?, NULL, 0, '', '', ?, 0, 1, SYSDATE, ?, 0)",
-            username, "!" + username, email, nickname
+            "VALUES (?, ?, NULL, 0, '', '', ?, 0, 1, SYSDATE, ?, ?)",
+            username, passwordColumnValue, email, nickname, emailVerified ? 1 : 0
         );
     }
 }

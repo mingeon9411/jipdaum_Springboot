@@ -2,6 +2,7 @@ package com.jipdaum_spring.domain.jipdaumuser;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "JIPDAUM_USER")
@@ -20,4 +21,12 @@ public class JipdaumUser {
 
     @Column(name = "username")
     private String username;
+
+    @Setter
+    @Column(name = "password")
+    private String password;
+
+    @Setter
+    @Column(name = "is_email_verified")
+    private Boolean emailVerified;
 }
