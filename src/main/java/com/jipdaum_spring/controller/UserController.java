@@ -6,7 +6,12 @@ import com.jipdaum_spring.domain.springuser.User;
 import com.jipdaum_spring.domain.springuser.UserRepository;
 import com.jipdaum_spring.dto.auth.EmailOtpSendRequest;
 import com.jipdaum_spring.dto.auth.EmailOtpVerifyRequest;
+import com.jipdaum_spring.dto.auth.LoginRequest;
+import com.jipdaum_spring.dto.auth.LoginResponse;
+import com.jipdaum_spring.dto.auth.LogoutRequest;
 import com.jipdaum_spring.dto.auth.NicknameCheckResponse;
+import com.jipdaum_spring.dto.auth.RegisterRequest;
+import com.jipdaum_spring.dto.auth.RegisterResponse;
 import com.jipdaum_spring.dto.common.MessageResponse;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import com.jipdaum_spring.service.UserAuthService;
@@ -30,6 +35,24 @@ public class UserController {
     private final UserRepository userRepository;
     private final JipdaumUserRepository jipdaumUserRepository;
     private final UserAuthService userAuthService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = userAuthService.register(request);
+        return ResponseEntity.status(201).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = userAuthService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody LogoutRequest request) {
+        userAuthService.logout(request);
+        return ResponseEntity.ok(new MessageResponse("로그아웃 완료"));
+    }
 
     @GetMapping("/nickname-check")
     public ResponseEntity<?> checkNickname(@RequestParam String nickname) {

@@ -1,5 +1,6 @@
 package com.jipdaum_spring.exception;
 
+import com.jipdaum_spring.dto.common.ErrorResponse;
 import com.jipdaum_spring.security.jwt.TokenExpiredException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleTokenExpired(TokenExpiredException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("code", "TOKEN_EXPIRED", "message", "액세스 토큰이 만료되었습니다."));
+    }
+
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<?> handleAuthException(AuthException e) {
+        return ResponseEntity.status(e.getStatus()).body(new ErrorResponse(e.getMessage()));
+    }
+
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<?> handleFieldValidation(FieldValidationException e) {
+        return ResponseEntity.badRequest().body(Map.of(e.getField(), e.getMessage()));
     }
 
     /**

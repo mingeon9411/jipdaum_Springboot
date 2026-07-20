@@ -7,6 +7,8 @@ import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
 import com.jipdaum_spring.domain.token.BlacklistedToken;
 import com.jipdaum_spring.domain.token.BlacklistedTokenRepository;
 import com.jipdaum_spring.dto.auth.*;
+import com.jipdaum_spring.exception.AuthException;
+import com.jipdaum_spring.exception.FieldValidationException;
 import com.jipdaum_spring.security.CurrentUserProvider;
 import com.jipdaum_spring.security.JipdaumUserProvisioner;
 import com.jipdaum_spring.security.captcha.HCaptchaVerifier;
@@ -22,7 +24,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -61,19 +62,19 @@ public class UserAuthService {
         String email = request.email().trim();
 
         if (nickname.length() < 2) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "닉네임은 최소 2자 이상이어야 합니다.");
+            throw new FieldValidationException("nickname", "닉네임은 최소 2자 이상이어야 합니다.");
         }
         if (nickname.length() > 30) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "닉네임은 최대 30자 이하여야 합니다.");
+            throw new FieldValidationException("nickname", "닉네임은 최대 30자 이하여야 합니다.");
         }
         if (jipdaumUserRepository.existsByNickname(nickname)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 사용 중인 닉네임입니다.");
+            throw new FieldValidationException("nickname", "이미 사용 중인 닉네임입니다.");
         }
         if (jipdaumUserRepository.existsByEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 사용 중인 이메일입니다.");
+            throw new FieldValidationException("email", "이미 사용 중인 이메일입니다.");
         }
         if (!request.password().equals(request.passwordConfirm())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+            throw new FieldValidationException("password_confirm", "비밀번호가 일치하지 않습니다.");
         }
         validatePasswordStrength(request.password(), email, nickname);
 
@@ -87,7 +88,7 @@ public class UserAuthService {
     @Transactional
     public LoginResponse login(LoginRequest request) {
         if (!hCaptchaVerifier.verify(request.recaptchaToken())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
         }
 
         String identifier = request.username().trim();
@@ -98,7 +99,7 @@ public class UserAuthService {
 
         if (user == null || user.getPassword() == null
                 || !passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않거나 비활성화된 계정입니다.");
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않거나 비활성화된 계정입니다.");
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail());
@@ -110,11 +111,11 @@ public class UserAuthService {
     public void logout(LogoutRequest request) {
         String refreshToken = request.refresh();
         if (!StringUtils.hasText(refreshToken)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "리프레시 토큰이 누락되었습니다.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "리프레시 토큰이 누락되었습니다.");
         }
         if (!JwtTokenProvider.TYPE_REFRESH.equals(jwtTokenProvider.getType(refreshToken))
                 || !jwtTokenProvider.validate(refreshToken)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유효하지 않은 토큰입니다.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "유효하지 않은 토큰입니다.");
         }
 
         Date expiration = jwtTokenProvider.getExpiration(refreshToken);
@@ -126,7 +127,7 @@ public class UserAuthService {
     public NicknameCheckResponse checkNickname(String rawNickname) {
         String nickname = rawNickname == null ? "" : rawNickname.trim();
         if (nickname.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "닉네임을 입력해주세요.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "닉네임을 입력해주세요.");
         }
         if (nickname.length() < 2) {
             return new NicknameCheckResponse(false, "닉네임은 최소 2자 이상이어야 합니다.");
@@ -145,7 +146,7 @@ public class UserAuthService {
         JipdaumUser user = currentUserProvider.getCurrentUser();
         String email = request.email().trim();
         if (email.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일을 입력해주세요.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "이메일을 입력해주세요.");
         }
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
@@ -161,7 +162,7 @@ public class UserAuthService {
             mailSender.send(message);
         } catch (MailException e) {
             log.warn("이메일 OTP 발송 실패 (email={})", email, e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요.");
+            throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요.");
         }
     }
 
@@ -173,10 +174,10 @@ public class UserAuthService {
 
         EmailOtp otp = emailOtpRepository
                 .findFirstByUserIdAndEmailAndCodeAndUsedFalseOrderByCreatedAtDesc(user.getId(), email, code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."));
+                .orElseThrow(() -> new AuthException(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."));
 
         if (otp.getCreatedAt().plusSeconds(OTP_TTL_SECONDS).isBefore(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 코드가 만료되었습니다. 재발송해주세요.");
+            throw new AuthException(HttpStatus.BAD_REQUEST, "인증 코드가 만료되었습니다. 재발송해주세요.");
         }
 
         otp.setUsed(true);
@@ -204,15 +205,15 @@ public class UserAuthService {
 
     private void validatePasswordStrength(String password, String email, String nickname) {
         if (password.length() < 8) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호는 최소 8자 이상이어야 합니다.");
+            throw new FieldValidationException("password", "비밀번호는 최소 8자 이상이어야 합니다.");
         }
         if (password.chars().allMatch(Character::isDigit)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 숫자로만 되어 있어 사용할 수 없습니다.");
+            throw new FieldValidationException("password", "비밀번호가 숫자로만 되어 있어 사용할 수 없습니다.");
         }
         int at = email.indexOf('@');
         String local = at > 0 ? email.substring(0, at) : email;
         if (password.equalsIgnoreCase(local) || password.equalsIgnoreCase(nickname)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 이메일 또는 닉네임과 너무 유사합니다.");
+            throw new FieldValidationException("password", "비밀번호가 이메일 또는 닉네임과 너무 유사합니다.");
         }
     }
 }

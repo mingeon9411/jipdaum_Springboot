@@ -56,9 +56,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**", "/api/shop/**",
-                                "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/social-exchange",
+                                "/api/auth/refresh", "/api/auth/social-exchange",
+                                "/api/users/register", "/api/users/login",
                                 "/api/users/me", "/api/users/nickname-check").permitAll()
-                        .requestMatchers("/api/auth/logout", "/api/users/email-verify/**").authenticated()
+                        .requestMatchers("/api/users/logout", "/api/users/email-verify/**").authenticated()
                         .requestMatchers("/api/admin/**", "/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
