@@ -4,7 +4,13 @@ import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
 import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
 import com.jipdaum_spring.domain.springuser.User;
 import com.jipdaum_spring.domain.springuser.UserRepository;
+import com.jipdaum_spring.dto.auth.EmailOtpSendRequest;
+import com.jipdaum_spring.dto.auth.EmailOtpVerifyRequest;
+import com.jipdaum_spring.dto.auth.NicknameCheckResponse;
+import com.jipdaum_spring.dto.common.MessageResponse;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
+import com.jipdaum_spring.service.UserAuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -23,6 +29,25 @@ public class UserController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final JipdaumUserRepository jipdaumUserRepository;
+    private final UserAuthService userAuthService;
+
+    @GetMapping("/nickname-check")
+    public ResponseEntity<?> checkNickname(@RequestParam String nickname) {
+        NicknameCheckResponse response = userAuthService.checkNickname(nickname);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/email-verify/send")
+    public ResponseEntity<?> sendEmailOtp(@Valid @RequestBody EmailOtpSendRequest request) {
+        userAuthService.sendEmailOtp(request);
+        return ResponseEntity.ok(new MessageResponse("인증 코드가 발송되었습니다."));
+    }
+
+    @PostMapping("/email-verify/confirm")
+    public ResponseEntity<?> verifyEmailOtp(@Valid @RequestBody EmailOtpVerifyRequest request) {
+        userAuthService.verifyEmailOtp(request);
+        return ResponseEntity.ok(new MessageResponse("이메일 인증이 완료되었습니다."));
+    }
 
     @GetMapping
     public ResponseEntity<?> getAllUsers() {

@@ -1,13 +1,22 @@
 package com.jipdaum_spring.controller;
 
 import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
+import com.jipdaum_spring.domain.token.BlacklistedTokenRepository;
 import com.jipdaum_spring.dto.auth.AccessTokenResponse;
+import com.jipdaum_spring.dto.auth.LoginRequest;
+import com.jipdaum_spring.dto.auth.LoginResponse;
+import com.jipdaum_spring.dto.auth.LogoutRequest;
 import com.jipdaum_spring.dto.auth.RefreshTokenRequest;
+import com.jipdaum_spring.dto.auth.RegisterRequest;
+import com.jipdaum_spring.dto.auth.RegisterResponse;
 import com.jipdaum_spring.dto.auth.SocialExchangeRequest;
 import com.jipdaum_spring.dto.auth.TokenPairResponse;
 import com.jipdaum_spring.dto.common.ErrorResponse;
+import com.jipdaum_spring.dto.common.MessageResponse;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import com.jipdaum_spring.security.oauth.SocialLoginCodeStore;
+import com.jipdaum_spring.service.UserAuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -24,6 +33,26 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final JipdaumUserRepository jipdaumUserRepository;
     private final SocialLoginCodeStore socialLoginCodeStore;
+    private final BlacklistedTokenRepository blacklistedTokenRepository;
+    private final UserAuthService userAuthService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = userAuthService.register(request);
+        return ResponseEntity.status(201).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = userAuthService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody LogoutRequest request) {
+        userAuthService.logout(request);
+        return ResponseEntity.ok(new MessageResponse("로그아웃 완료"));
+    }
 
     /**
      * OAuth2 로그인 성공 후 리다이렉트로 전달받은 1회용 code를 실제 access/refresh 토큰으로 교환한다.
@@ -53,7 +82,8 @@ public class AuthController {
         // 계속 통과시켜 기존 호환성을 유지한다.
         if (!StringUtils.hasText(refreshToken)
                 || JwtTokenProvider.TYPE_ACCESS.equals(jwtTokenProvider.getType(refreshToken))
-                || !jwtTokenProvider.validate(refreshToken)) {
+                || !jwtTokenProvider.validate(refreshToken)
+                || blacklistedTokenRepository.existsByToken(refreshToken)) {
             return ResponseEntity.status(401).body(new ErrorResponse("Invalid or expired refresh token"));
         }
 

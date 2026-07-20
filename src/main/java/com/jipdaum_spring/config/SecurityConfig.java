@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -42,13 +44,21 @@ public class SecurityConfig {
     }
 
     @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/oauth2/**", "/login/**", "/api/users/me", "/api/auth/**", "/api/shop/**").permitAll()
+                        .requestMatchers("/oauth2/**", "/login/**", "/api/shop/**",
+                                "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/social-exchange",
+                                "/api/users/me", "/api/users/nickname-check").permitAll()
+                        .requestMatchers("/api/auth/logout", "/api/users/email-verify/**").authenticated()
                         .requestMatchers("/api/admin/**", "/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
