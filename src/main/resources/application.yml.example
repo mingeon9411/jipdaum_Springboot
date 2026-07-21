@@ -13,6 +13,10 @@ spring:
     hibernate:
       # Django 마이그레이션이 스키마를 소유한다. Spring이 스키마를 바꾸지 않도록 반드시 none 유지.
       ddl-auto: none
+      naming:
+        # Spring 기본 네이밍 전략이 @Table(name="JIPDAUM_CATEGORY")도 강제로 소문자 스네이크케이스로
+        # 바꿔버려서 Django가 만든 대문자 테이블과 매칭이 안 됨 - 명시한 이름을 그대로 쓰도록 강제.
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     show-sql: true
     open-in-view: false
   mail:
