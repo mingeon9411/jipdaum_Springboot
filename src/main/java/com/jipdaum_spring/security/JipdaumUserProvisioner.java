@@ -53,7 +53,7 @@ public class JipdaumUserProvisioner {
             "INSERT INTO JIPDAUM_USER " +
             "(username, password, last_login, is_superuser, first_name, last_name, " +
             "email, is_staff, is_active, created_at, nickname, is_email_verified) " +
-            "VALUES (?, ?, NULL, 0, '', '', ?, 0, 1, SYSDATE, ?, ?)",
+            "VALUES (?, ?, NULL, 0, '', '', ?, 0, 1, CURRENT_TIMESTAMP, ?, ?)",
             username, passwordColumnValue, email, nickname, emailVerified ? 1 : 0
         );
     }
