@@ -12,3 +12,5 @@ public interface JipdaumUserRepository extends JpaRepository<JipdaumUser, Long> 
     boolean existsByNickname(String nickname);
     boolean existsByEmail(String email);
 }
+
+

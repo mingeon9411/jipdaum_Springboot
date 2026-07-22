@@ -33,7 +33,7 @@ public class CartController {
     @PutMapping
     public ResponseEntity<?> updateCart(@Valid @RequestBody UpdateCartRequest request) {
         cartService.updateCart(request);
-        return ResponseEntity.ok(new MessageResponse("수량이 수정되었습니다."));
+        return ResponseEntity.ok(new MessageResponse("수량이 변경되었습니다."));
     }
 
     @DeleteMapping

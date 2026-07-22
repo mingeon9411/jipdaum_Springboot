@@ -29,4 +29,8 @@ public class JipdaumUser {
     @Setter
     @Column(name = "is_email_verified")
     private Boolean emailVerified;
+
+    @Setter
+    @Column(name = "is_active")
+    private Boolean active;
 }

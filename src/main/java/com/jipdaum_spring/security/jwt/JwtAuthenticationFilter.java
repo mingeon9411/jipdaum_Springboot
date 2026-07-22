@@ -10,6 +10,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Optional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -64,9 +67,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
 
-            if (email != null) {
+            // 탈퇴(is_active=0)한 사용자는 access token이 아직 안 만료됐어도 더 이상 인증시키지 않는다.
+            boolean withdrawn = email != null && jipdaumUserRepository.findByEmail(email)
+                    .map(u -> Boolean.FALSE.equals(u.getActive()))
+                    .orElse(false);
+
+            if (email != null && !withdrawn) {
                 String resolvedEmail = email;
-                Optional<User> springUser = userRepository.findByEmail(email);
+                // users 테이블은 부가 정보 보조 저장용이라, 조회 실패해도 인증 자체는 막지 않는다.
+                Optional<User> springUser;
+                try {
+                    springUser = userRepository.findByEmail(email);
+                } catch (DataAccessException e) {
+                    log.warn("users 테이블 조회 실패 — 부가 정보 없이 인증 계속 진행 (email={})", email, e);
+                    springUser = Optional.empty();
+                }
                 User authUser = springUser.orElseGet(() ->
                         User.builder().email(resolvedEmail).role(User.Role.USER).build());
 
