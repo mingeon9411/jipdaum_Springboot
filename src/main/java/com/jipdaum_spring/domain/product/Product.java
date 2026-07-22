@@ -30,6 +30,7 @@ public class Product {
     @Column(name = "brand")
     private String brand;
 
+
     @Column(name = "base_price")
     private Integer basePrice;
 

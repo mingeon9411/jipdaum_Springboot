@@ -4,6 +4,8 @@ import com.jipdaum_spring.domain.springuser.User;
 import com.jipdaum_spring.domain.springuser.UserRepository;
 import com.jipdaum_spring.security.JipdaumUserProvisioner;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
@@ -41,7 +44,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             }
             case "kakao" -> {
                 Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+                if (kakaoAccount == null) {
+                    throw new OAuth2AuthenticationException(
+                            "카카오 응답에 kakao_account가 없습니다. 카카오 개발자센터에서 닉네임 동의항목이 켜져 있는지 확인하세요.");
+                }
                 Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+                if (profile == null) {
+                    throw new OAuth2AuthenticationException(
+                            "카카오 응답에 profile이 없습니다. 카카오 개발자센터에서 닉네임 동의항목이 켜져 있는지 확인하세요.");
+                }
                 providerId = String.valueOf(attributes.get("id"));
                 email = "kakao_" + providerId;
                 name = (String) profile.get("nickname");
@@ -49,29 +60,46 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             }
             case "naver" -> {
                 Map<String, Object> response = (Map<String, Object>) attributes.get("response");
-                email = (String) response.get("email");
+                if (response == null) {
+                    throw new OAuth2AuthenticationException(
+                            "네이버 응답에 response가 없습니다. 네이버 개발자센터에서 필수 제공 항목 설정을 확인하세요.");
+                }
                 name = (String) response.get("name");
                 profileImage = (String) response.get("profile_image");
                 providerId = (String) response.get("id");
+                String naverEmail = (String) response.get("email");
+                if (naverEmail == null) {
+                    // 네이버 개발자센터에서 이메일 제공 항목이 꺼져 있으면 응답에 email이 없다.
+                    // 카카오와 동일하게 로그인 자체는 막지 않고 provider 기반 placeholder를 쓴다.
+                    log.warn("네이버 응답에 email이 없습니다. 네이버 개발자센터의 제공 정보(이메일) 설정을 확인하세요. (providerId={})", providerId);
+                    email = "naver_" + providerId;
+                } else {
+                    email = naverEmail;
+                }
             }
             default -> throw new OAuth2AuthenticationException("Unsupported provider: " + registrationId);
         }
 
-        final String finalEmail = email;
         final String finalName = name;
         final String finalProfileImage = profileImage;
 
-        User user = userRepository.findByProviderAndProviderId(registrationId, providerId)
-                .map(u -> u.update(finalName, finalProfileImage))
-                .orElse(User.builder()
-                        .email(email)
-                        .name(name)
-                        .profileImage(profileImage)
-                        .provider(registrationId)
-                        .providerId(providerId)
-                        .role(User.Role.USER)
-                        .build());
-        userRepository.save(user);
+        // users 테이블은 프로필 이미지 등 부가 정보 보조 저장용이라, 조회/저장이 실패해도
+        // 로그인 자체(JIPDAUM_USER 기준)는 막지 않는다.
+        try {
+            User user = userRepository.findByProviderAndProviderId(registrationId, providerId)
+                    .map(u -> u.update(finalName, finalProfileImage))
+                    .orElse(User.builder()
+                            .email(email)
+                            .name(name)
+                            .profileImage(profileImage)
+                            .provider(registrationId)
+                            .providerId(providerId)
+                            .role(User.Role.USER)
+                            .build());
+            userRepository.save(user);
+        } catch (DataAccessException e) {
+            log.warn("소셜 로그인 부가 정보(users 테이블) 저장 실패 — 로그인은 계속 진행 (email={})", email, e);
+        }
 
         // JIPDAUM_USER(Django 공유 테이블)에도 사용자 존재 보장 — Order FK에 필요
         jipdaumUserProvisioner.ensureExists(

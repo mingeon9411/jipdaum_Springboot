@@ -123,6 +123,27 @@ public class UserAuthService {
         blacklistedTokenRepository.save(new BlacklistedToken(refreshToken, expiresAt));
     }
 
+    /**
+     * 회원 탈퇴. JIPDAUM_USER는 주문/리뷰 등 다수 FK의 참조 대상이라 하드 삭제 대신
+     * is_active=0으로 비활성화한다(Django User 모델의 통상적인 탈퇴 처리 방식과 동일).
+     * 진행 중인 refresh token도 즉시 블랙리스트에 올려 재발급을 막는다.
+     */
+    @Transactional
+    public void withdraw(WithdrawRequest request) {
+        JipdaumUser user = currentUserProvider.getCurrentUser();
+        user.setActive(false);
+        jipdaumUserRepository.save(user);
+
+        String refreshToken = request.refresh();
+        if (StringUtils.hasText(refreshToken)
+                && JwtTokenProvider.TYPE_REFRESH.equals(jwtTokenProvider.getType(refreshToken))
+                && jwtTokenProvider.validate(refreshToken)) {
+            Date expiration = jwtTokenProvider.getExpiration(refreshToken);
+            LocalDateTime expiresAt = expiration.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+            blacklistedTokenRepository.save(new BlacklistedToken(refreshToken, expiresAt));
+        }
+    }
+
     @Transactional(readOnly = true)
     public NicknameCheckResponse checkNickname(String rawNickname) {
         String nickname = rawNickname == null ? "" : rawNickname.trim();

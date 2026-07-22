@@ -2,6 +2,7 @@ package com.jipdaum_spring.config;
 
 import com.jipdaum_spring.security.jwt.JwtAuthenticationFilter;
 import com.jipdaum_spring.security.oauth.CustomOAuth2UserService;
+import com.jipdaum_spring.security.oauth.OAuth2FailureHandler;
 import com.jipdaum_spring.security.oauth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Value("${app.frontend-url}")
@@ -59,7 +61,7 @@ public class SecurityConfig {
                                 "/api/auth/refresh", "/api/auth/social-exchange",
                                 "/api/users/register", "/api/users/login",
                                 "/api/users/me", "/api/users/nickname-check").permitAll()
-                        .requestMatchers("/api/users/logout", "/api/users/email-verify/**").authenticated()
+                        .requestMatchers("/api/users/logout", "/api/users/withdraw", "/api/users/email-verify/**").authenticated()
                         .requestMatchers("/api/admin/**", "/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -68,6 +70,7 @@ public class SecurityConfig {
                                 .userService(customOAuth2UserService)
                         )
                         .successHandler(oAuth2SuccessHandler)
+                        .failureHandler(oAuth2FailureHandler)
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

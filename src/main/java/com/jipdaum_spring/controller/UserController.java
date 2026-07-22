@@ -12,11 +12,14 @@ import com.jipdaum_spring.dto.auth.LogoutRequest;
 import com.jipdaum_spring.dto.auth.NicknameCheckResponse;
 import com.jipdaum_spring.dto.auth.RegisterRequest;
 import com.jipdaum_spring.dto.auth.RegisterResponse;
+import com.jipdaum_spring.dto.auth.WithdrawRequest;
 import com.jipdaum_spring.dto.common.MessageResponse;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import com.jipdaum_spring.service.UserAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -52,6 +56,12 @@ public class UserController {
     public ResponseEntity<?> logout(@RequestBody LogoutRequest request) {
         userAuthService.logout(request);
         return ResponseEntity.ok(new MessageResponse("로그아웃 완료"));
+    }
+
+    @PostMapping("/withdraw")
+    public ResponseEntity<?> withdraw(@RequestBody(required = false) WithdrawRequest request) {
+        userAuthService.withdraw(request != null ? request : new WithdrawRequest(null));
+        return ResponseEntity.ok(new MessageResponse("탈퇴가 완료되었습니다."));
     }
 
     @GetMapping("/nickname-check")
@@ -135,7 +145,13 @@ public class UserController {
         if (jipdaumUser == null) {
             return ResponseEntity.status(404).body("User not found");
         }
-        User springUser = userRepository.findByEmail(email).orElse(null);
+        User springUser;
+        try {
+            springUser = userRepository.findByEmail(email).orElse(null);
+        } catch (DataAccessException e) {
+            log.warn("users 테이블 조회 실패 — 부가 정보 없이 응답 (email={})", email, e);
+            springUser = null;
+        }
 
         Map<String, Object> body = new HashMap<>();
         body.put("id", jipdaumUser.getId());
