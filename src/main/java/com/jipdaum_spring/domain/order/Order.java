@@ -45,6 +45,12 @@ public class Order {
     @Column(name = "order_date")
     private LocalDateTime orderDate;
 
+    @Column(name = "carrier")
+    private String carrier;
+
+    @Column(name = "tracking_number")
+    private String trackingNumber;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -69,6 +75,11 @@ public class Order {
 
     public void cancel() {
         this.status = "CANCELLED";
+    }
+
+    public void assignTracking(String carrier, String trackingNumber) {
+        this.carrier = carrier;
+        this.trackingNumber = trackingNumber;
     }
 
     public String getStatusDisplay() {
