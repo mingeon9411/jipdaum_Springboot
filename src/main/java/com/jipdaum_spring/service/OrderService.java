@@ -16,6 +16,7 @@ import com.jipdaum_spring.dto.order.CreateOrderRequest;
 import com.jipdaum_spring.dto.order.CreateOrderResponse;
 import com.jipdaum_spring.dto.order.OrderHistoryResponse;
 import com.jipdaum_spring.dto.order.OrderItemRequest;
+import com.jipdaum_spring.dto.order.OrderTrackingResponse;
 import com.jipdaum_spring.dto.order.PaymentReadyRequest;
 import com.jipdaum_spring.dto.order.PaymentReadyResponse;
 import com.jipdaum_spring.dto.order.PaymentVerifyRequest;
@@ -52,6 +53,7 @@ public class OrderService {
     private final UserCouponRepository userCouponRepository;
     private final CartRepository cartRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final TrackingProvider trackingProvider;
 
     private JipdaumUser getCurrentUser() {
         return currentUserProvider.getCurrentUser();
@@ -214,6 +216,7 @@ public class OrderService {
 
         Order order = payment.getOrder();
         order.complete();
+        order.assignTracking("CJ대한통운", generateTrackingNumber(order.getId()));
         orderRepository.save(order);
 
         // 실제 돈이 오간 뒤이므로 재고가 이미 바닥났더라도 주문 자체는 되돌리지 않는다(환불 절차 없음).
@@ -248,5 +251,24 @@ public class OrderService {
         return orderRepository.findByUserOrderByOrderDateDesc(user).stream()
                 .map(OrderHistoryResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrderTrackingResponse getTracking(Long orderId) {
+        JipdaumUser user = getCurrentUser();
+        Order order = orderRepository.findByIdAndUser(orderId, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+
+        if ("PENDING".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "배송 조회가 가능한 주문이 아닙니다.");
+        if (order.getTrackingNumber() == null || order.getTrackingNumber().isBlank())
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "아직 발급된 운송장 정보가 없습니다.");
+
+        return trackingProvider.getTracking(order);
+    }
+
+    // 실제 택배사 API 연동 전까지 쓰는 임시 운송장 번호 포맷 (CJ대한통운 12자리 형식을 흉내냄)
+    private String generateTrackingNumber(Long orderId) {
+        return String.format("68%010d", orderId);
     }
 }

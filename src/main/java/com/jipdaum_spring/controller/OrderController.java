@@ -40,4 +40,9 @@ public class OrderController {
     public ResponseEntity<?> getHistory() {
         return ResponseEntity.ok(orderService.getOrderHistory());
     }
+
+    @GetMapping("/{id}/tracking")
+    public ResponseEntity<?> getTracking(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getTracking(id));
+    }
 }
