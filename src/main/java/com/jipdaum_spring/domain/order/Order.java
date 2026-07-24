@@ -46,10 +46,10 @@ public class Order {
     private LocalDateTime orderDate;
 
     @Column(name = "carrier")
-    private String carrier;
+    private String carrier = "";
 
     @Column(name = "tracking_number")
-    private String trackingNumber;
+    private String trackingNumber = "";
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OrderItem> items = new ArrayList<>();
