@@ -13,13 +13,16 @@ import com.jipdaum_spring.security.CurrentUserProvider;
 import com.jipdaum_spring.security.JipdaumUserProvisioner;
 import com.jipdaum_spring.security.captcha.HCaptchaVerifier;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -175,13 +178,23 @@ public class UserAuthService {
         emailOtpRepository.save(new EmailOtp(user.getId(), email, code));
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(email);
-            message.setSubject("[집다움] 이메일 인증 코드");
-            message.setText("인증 코드: " + code + "\n5분 이내에 입력해주세요.");
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(mailFrom);
+            helper.setTo(email);
+            helper.setSubject("[집다움] 이메일 인증 코드");
+            helper.setText("""
+                    <div style="font-family:'Malgun Gothic',sans-serif;max-width:420px;margin:0 auto;padding:32px 24px;">
+                      <img src="cid:jipdaumLogo" alt="집다움" style="height:36px;margin-bottom:28px;" />
+                      <p style="font-size:15px;color:#333;margin:0 0 8px;">안녕하세요, 집다움입니다.</p>
+                      <p style="font-size:15px;color:#333;margin:0 0 20px;">요청하신 보안코드는 %s입니다.</p>
+                      <p style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#1a1a1a;margin:0 0 20px;">%s</p>
+                      <p style="font-size:13px;color:#888;margin:0;">인증코드는 5분간 유효합니다. 본인이 요청하지 않았다면 이 메일을 무시해주세요.</p>
+                    </div>
+                    """.formatted(code, code), true);
+            helper.addInline("jipdaumLogo", new ClassPathResource("mail/logo.png"));
             mailSender.send(message);
-        } catch (MailException e) {
+        } catch (MessagingException | MailException e) {
             log.warn("이메일 OTP 발송 실패 (email={})", email, e);
             throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요.");
         }
