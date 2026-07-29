@@ -185,14 +185,19 @@ public class UserAuthService {
             helper.setSubject("[집다움] 이메일 인증 코드");
             helper.setText("""
                     <div style="font-family:'Malgun Gothic',sans-serif;max-width:420px;margin:0 auto;padding:32px 24px;">
-                      <img src="cid:jipdaumLogo" alt="집다움" style="height:36px;margin-bottom:28px;" />
+                      <div style="display:flex;align-items:center;gap:14px;margin-bottom:28px;">
+                        <img src="cid:jdLogo" alt="J.D" style="height:32px;" />
+                        <div style="width:1px;height:28px;background:#d8d8d8;"></div>
+                        <img src="cid:hanokLogo" alt="집다움" style="height:40px;" />
+                      </div>
                       <p style="font-size:15px;color:#333;margin:0 0 8px;">안녕하세요, 집다움입니다.</p>
                       <p style="font-size:15px;color:#333;margin:0 0 20px;">요청하신 보안코드는 %s입니다.</p>
                       <p style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#1a1a1a;margin:0 0 20px;">%s</p>
                       <p style="font-size:13px;color:#888;margin:0;">인증코드는 5분간 유효합니다. 본인이 요청하지 않았다면 이 메일을 무시해주세요.</p>
                     </div>
                     """.formatted(code, code), true);
-            helper.addInline("jipdaumLogo", new ClassPathResource("mail/logo.png"));
+            helper.addInline("jdLogo", new ClassPathResource("mail/jd-logo.png"));
+            helper.addInline("hanokLogo", new ClassPathResource("mail/hanok-logo.png"));
             mailSender.send(message);
         } catch (MessagingException | MailException e) {
             log.warn("이메일 OTP 발송 실패 (email={})", email, e);
