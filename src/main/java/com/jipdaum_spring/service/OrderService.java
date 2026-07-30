@@ -199,7 +199,8 @@ public class OrderService {
                     HttpMethod.GET, entity, Map.class);
             portoneData = res.getBody();
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "PortOne 결제 검증에 실패했습니다: " + e.getMessage());
+            log.warn("PortOne 결제 검증 API 호출 실패 - paymentId={}", request.paymentId(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "PortOne 결제 검증에 실패했습니다.");
         }
 
         String portoneStatus = portoneData != null ? (String) portoneData.get("status") : null;
