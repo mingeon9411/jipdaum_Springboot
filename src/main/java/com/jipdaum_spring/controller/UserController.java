@@ -1,7 +1,6 @@
 package com.jipdaum_spring.controller;
 
 import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
-import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
 import com.jipdaum_spring.domain.springuser.User;
 import com.jipdaum_spring.domain.springuser.UserRepository;
 import com.jipdaum_spring.dto.auth.EmailOtpSendRequest;
@@ -14,14 +13,13 @@ import com.jipdaum_spring.dto.auth.RegisterRequest;
 import com.jipdaum_spring.dto.auth.RegisterResponse;
 import com.jipdaum_spring.dto.auth.WithdrawRequest;
 import com.jipdaum_spring.dto.common.MessageResponse;
-import com.jipdaum_spring.security.jwt.JwtTokenProvider;
+import com.jipdaum_spring.security.CurrentUserProvider;
 import com.jipdaum_spring.service.UserAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -35,10 +33,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final JipdaumUserRepository jipdaumUserRepository;
     private final UserAuthService userAuthService;
+    private final CurrentUserProvider currentUserProvider;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
@@ -109,47 +106,18 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getMe(@RequestHeader("Authorization") String bearerToken) {
-        if (!StringUtils.hasText(bearerToken) || !bearerToken.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-
-        String token = bearerToken.substring(7);
-        if (JwtTokenProvider.TYPE_REFRESH.equals(jwtTokenProvider.getType(token))) {
-            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
-        }
-        JwtTokenProvider.TokenStatus status = jwtTokenProvider.validateToken(token);
-        if (status == JwtTokenProvider.TokenStatus.EXPIRED) {
-            return ResponseEntity.status(401).body(Map.of("code", "TOKEN_EXPIRED", "message", "액세스 토큰이 만료되었습니다."));
-        }
-        if (status != JwtTokenProvider.TokenStatus.VALID) {
-            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
-        }
-
-        String email = jwtTokenProvider.getEmail(token);
-
-        // Django SimpleJWT: sub 없이 user_id 클레임 사용
-        if (email == null) {
-            Long userId = jwtTokenProvider.getUserId(token);
-            if (userId != null) {
-                email = jipdaumUserRepository.findById(userId).map(JipdaumUser::getEmail).orElse(null);
-            }
-        }
-        if (email == null) {
-            return ResponseEntity.status(401).body(Map.of("code", "INVALID_TOKEN", "message", "Invalid token"));
-        }
+    public ResponseEntity<?> getMe() {
+        // CurrentUserProvider를 통해야 JwtAuthenticationFilter가 강제하는 만료/탈퇴(is_active=0) 체크가
+        // 그대로 적용된다 — 직접 토큰을 파싱하면 이 체크들을 우회하게 되므로 반드시 이 경로를 거친다.
+        JipdaumUser jipdaumUser = currentUserProvider.getCurrentUser();
 
         // JIPDAUM_USER(Django와 공유하는 테이블)가 실제 nickname의 source of truth.
         // Spring 자체 users 테이블은 소셜 로그인 부가 정보(프로필 이미지 등)만 보조로 사용한다.
-        JipdaumUser jipdaumUser = jipdaumUserRepository.findByEmail(email).orElse(null);
-        if (jipdaumUser == null) {
-            return ResponseEntity.status(404).body("User not found");
-        }
         User springUser;
         try {
-            springUser = userRepository.findByEmail(email).orElse(null);
+            springUser = userRepository.findByEmail(jipdaumUser.getEmail()).orElse(null);
         } catch (DataAccessException e) {
-            log.warn("users 테이블 조회 실패 — 부가 정보 없이 응답 (email={})", email, e);
+            log.warn("users 테이블 조회 실패 — 부가 정보 없이 응답 (email={})", jipdaumUser.getEmail(), e);
             springUser = null;
         }
 

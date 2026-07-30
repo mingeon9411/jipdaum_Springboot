@@ -61,6 +61,10 @@ public class UserAuthService {
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
+        if (!hCaptchaVerifier.verify(request.recaptchaToken())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
+        }
+
         String nickname = request.nickname().trim();
         String email = request.email().trim();
 
