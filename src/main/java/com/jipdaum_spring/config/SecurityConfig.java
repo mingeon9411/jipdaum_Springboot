@@ -2,6 +2,7 @@ package com.jipdaum_spring.config;
 
 import com.jipdaum_spring.security.jwt.JwtAuthenticationFilter;
 import com.jipdaum_spring.security.oauth.CustomOAuth2UserService;
+import com.jipdaum_spring.security.oauth.ForceReloginAuthorizationRequestResolver;
 import com.jipdaum_spring.security.oauth.OAuth2FailureHandler;
 import com.jipdaum_spring.security.oauth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class SecurityConfig {
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ForceReloginAuthorizationRequestResolver forceReloginAuthorizationRequestResolver;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -73,6 +75,9 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(forceReloginAuthorizationRequestResolver)
+                        )
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )

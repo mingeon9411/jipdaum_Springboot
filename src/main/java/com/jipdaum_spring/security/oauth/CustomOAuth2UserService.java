@@ -83,19 +83,29 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         final String finalName = name;
         final String finalProfileImage = profileImage;
 
+        // 이전에 이미 이 provider+providerId로 가입된 계정이 있으면 그때 확정된 email(또는
+        // placeholder)을 계속 써야 한다. 특히 네이버는 이메일 제공 동의 여부가 로그인마다 달라질 수
+        // 있는데, 여기서 새로 받아온 email로 덮어써 버리면 JIPDAUM_USER 조회가 어긋나면서 기존 주문/
+        // 쿠폰 내역이 없는 별도 계정이 새로 생기고 마이페이지가 텅 비어 보이는 문제가 생긴다.
+        User existingUser = userRepository.findByProviderAndProviderId(registrationId, providerId).orElse(null);
+        if (existingUser != null && existingUser.getEmail() != null) {
+            email = existingUser.getEmail();
+        }
+        final String finalEmail = email;
+
         // users 테이블은 프로필 이미지 등 부가 정보 보조 저장용이라, 조회/저장이 실패해도
         // 로그인 자체(JIPDAUM_USER 기준)는 막지 않는다.
         try {
-            User user = userRepository.findByProviderAndProviderId(registrationId, providerId)
-                    .map(u -> u.update(finalName, finalProfileImage))
-                    .orElse(User.builder()
-                            .email(email)
+            User user = existingUser != null
+                    ? existingUser.update(finalName, finalProfileImage)
+                    : User.builder()
+                            .email(finalEmail)
                             .name(name)
                             .profileImage(profileImage)
                             .provider(registrationId)
                             .providerId(providerId)
                             .role(User.Role.USER)
-                            .build());
+                            .build();
             userRepository.save(user);
         } catch (DataAccessException e) {
             log.warn("소셜 로그인 부가 정보(users 테이블) 저장 실패 — 로그인은 계속 진행 (email={})", email, e);
