@@ -1,0 +1,9 @@
+target/
+*.log
+.git
+.idea
+.mvn/wrapper/maven-wrapper.jar
+*.iml
+*.pptx
+src/main/resources/application.yml
+src/main/resources/application-*.yml
