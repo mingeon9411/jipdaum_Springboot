@@ -38,3 +38,6 @@ src/main/resources/application-*.yml
 
 ### Claude Code ###
 .claude/
+
+### Logs ###
+*.log
