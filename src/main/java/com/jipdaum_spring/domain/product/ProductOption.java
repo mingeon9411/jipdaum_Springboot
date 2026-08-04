@@ -1,14 +1,18 @@
 package com.jipdaum_spring.domain.product;
 
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "JIPDAUM_PRODUCT_OPTION")
 @Getter
+@NoArgsConstructor
 public class ProductOption {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
@@ -27,4 +31,21 @@ public class ProductOption {
 
     @Column(name = "stock_count")
     private Integer stockCount;
+
+    @Builder
+    public ProductOption(Product product, String optionName, String optionValue, Integer extraPrice, Integer stockCount) {
+        this.product = product;
+        this.optionName = optionName;
+        this.optionValue = optionValue;
+        this.extraPrice = extraPrice;
+        this.stockCount = stockCount;
+    }
+
+    public ProductOption update(String optionName, String optionValue, Integer extraPrice, Integer stockCount) {
+        this.optionName = optionName;
+        this.optionValue = optionValue;
+        this.extraPrice = extraPrice;
+        this.stockCount = stockCount;
+        return this;
+    }
 }
