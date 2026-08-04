@@ -5,7 +5,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ProductOptionRepository extends JpaRepository<ProductOption, Long> {
+
+    List<ProductOption> findByProductId(Long productId);
 
     /**
      * 재고가 충분한 경우에만 원자적으로 차감한다. 동시에 결제가 완료되는 여러 주문이
