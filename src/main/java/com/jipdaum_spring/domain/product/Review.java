@@ -30,6 +30,9 @@ public class Review {
     @Column(name = "rating")
     private Integer rating;
 
+    @Column(name = "title")
+    private String title;
+
     @Column(name = "comment", columnDefinition = "CLOB")
     private String comment;
 
@@ -40,10 +43,11 @@ public class Review {
     private LocalDateTime createdAt;
 
     @Builder
-    public Review(Product product, JipdaumUser user, Integer rating, String comment, String reviewImageUrl) {
+    public Review(Product product, JipdaumUser user, Integer rating, String title, String comment, String reviewImageUrl) {
         this.product = product;
         this.user = user;
         this.rating = rating;
+        this.title = title != null ? title : "";
         this.comment = comment;
         this.reviewImageUrl = reviewImageUrl;
         this.createdAt = LocalDateTime.now();

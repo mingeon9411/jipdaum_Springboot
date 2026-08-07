@@ -64,6 +64,9 @@ public class SecurityConfig {
                                 "/api/auth/refresh", "/api/auth/social-exchange",
                                 "/api/users/register", "/api/users/login",
                                 "/api/users/me", "/api/users/nickname-check").permitAll()
+                        // 업로드된 리뷰 사진 등은 정적 파일 서빙이라 비로그인 방문자도 볼 수 있어야 한다.
+                        // (업로드 자체는 /api/shop/uploads/**로, 아래 /api/shop/** authenticated 규칙에 걸린다)
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         // 상품 조회와 챗봇은 비로그인 방문자도 이용 가능해야 하므로 공개 유지.
                         // 장바구니/주문/쿠폰/리뷰 작성 등 나머지 /api/shop/**는 로그인이 필요하다 —
                         // 서비스 계층의 CurrentUserProvider 체크에만 기대지 않고 필터 단계에서도 강제한다.
