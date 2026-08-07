@@ -82,6 +82,7 @@ public class ProductService {
                 .product(product)
                 .user(user)
                 .rating(request.rating())
+                .title(request.title())
                 .comment(request.comment())
                 .reviewImageUrl(request.reviewImageUrl())
                 .build();

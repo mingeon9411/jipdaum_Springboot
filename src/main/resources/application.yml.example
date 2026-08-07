@@ -19,6 +19,10 @@ spring:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     show-sql: true
     open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   mail:
     # 이메일 OTP 발송용. 실제 발송 테스트가 필요 없으면 더미 값으로 둬도 부팅은 됨(연결은 부팅 시 검증 안 함).
     host: smtp.gmail.com
@@ -68,6 +72,7 @@ spring:
 
 app:
   frontend-url: http://localhost:5173
+  upload-dir: ./uploads
   mail:
     from: dummy@gmail.com
 

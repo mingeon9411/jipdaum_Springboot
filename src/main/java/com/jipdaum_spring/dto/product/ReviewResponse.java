@@ -11,6 +11,7 @@ public record ReviewResponse(
         Long user,
         @JsonProperty("user_nickname") String userNickname,
         Integer rating,
+        String title,
         String comment,
         @JsonProperty("review_image_url") String reviewImageUrl,
         @JsonProperty("created_at") LocalDateTime createdAt
@@ -22,6 +23,7 @@ public record ReviewResponse(
                 r.getUser() != null ? r.getUser().getId() : null,
                 r.getUser() != null ? r.getUser().getNickname() : "",
                 r.getRating(),
+                r.getTitle(),
                 r.getComment(),
                 r.getReviewImageUrl(),
                 r.getCreatedAt()
