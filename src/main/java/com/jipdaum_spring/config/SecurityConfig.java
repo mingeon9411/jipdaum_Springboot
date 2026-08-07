@@ -1,5 +1,6 @@
 package com.jipdaum_spring.config;
 
+import com.jipdaum_spring.security.RestAuthenticationEntryPoint;
 import com.jipdaum_spring.security.jwt.JwtAuthenticationFilter;
 import com.jipdaum_spring.security.oauth.CustomOAuth2UserService;
 import com.jipdaum_spring.security.oauth.ForceReloginAuthorizationRequestResolver;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -31,6 +33,7 @@ public class SecurityConfig {
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ForceReloginAuthorizationRequestResolver forceReloginAuthorizationRequestResolver;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -59,6 +62,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // oauth2Login()의 기본 진입점은 인증 실패 시 /login으로 302 리다이렉트한다.
+                // 이 앱은 순수 REST API라 그건 axios가 그대로 따라가버려 크래시로 이어지므로,
+                // /api/**만 골라서 항상 401 JSON을 받도록 강제한다. authenticationEntryPoint(...)로
+                // 통째로 덮어쓰면 oauth2Login()이 내부적으로 등록하는 자기 진입점까지 같이
+                // 사라지므로, defaultAuthenticationEntryPointFor + 매처로 /api/** 범위만 좁힌다.
+                .exceptionHandling(exceptions -> exceptions.defaultAuthenticationEntryPointFor(
+                        restAuthenticationEntryPoint, new AntPathRequestMatcher("/api/**")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**",
                                 "/api/auth/refresh", "/api/auth/social-exchange",
