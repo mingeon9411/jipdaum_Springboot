@@ -84,3 +84,10 @@ jwt:
 
 portone:
   api-secret: dummy-portone-api-secret
+
+gemini:
+  # 챗봇 LLM 연동. https://aistudio.google.com 에서 API 키 발급 후 로컬 application.yml에만 채워 넣을 것
+  # (이 값이 비어 있으면 ChatService가 자동으로 규칙 기반 답변으로 폴백하므로 부팅/테스트는 문제 없음).
+  api-key: ''
+  model: gemini-3.7-flash
+  base-url: https://generativelanguage.googleapis.com/v1beta
