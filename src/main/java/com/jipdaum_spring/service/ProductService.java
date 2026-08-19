@@ -71,6 +71,13 @@ public class ProductService {
                 .toList();
     }
 
+    // 갤러리(룩북) 패널용 — 상품 상관없이 사진 첨부된 최신 리뷰만 모아서 보여준다.
+    public List<ReviewResponse> getPhotoReviews() {
+        return reviewRepository.findTop100ByReviewImageUrlIsNotNullOrderByCreatedAtDesc().stream()
+                .map(ReviewResponse::from)
+                .toList();
+    }
+
     @Transactional
     public CreateReviewResponse createReview(Long productId, CreateReviewRequest request) {
         Product product = productRepository.findById(productId)

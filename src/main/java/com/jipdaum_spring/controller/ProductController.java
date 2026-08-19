@@ -37,6 +37,13 @@ public class ProductController {
         return ResponseEntity.ok(productService.getReviews(id));
     }
 
+    // 룩북 갤러리 패널용 — 상품 상관없이 사진 첨부된 최신 리뷰만 모아서 보여준다.
+    // "/{id}"보다 세그먼트가 많은 리터럴 경로라 라우팅 충돌 없음.
+    @GetMapping("/reviews/photos")
+    public ResponseEntity<?> getPhotoReviews() {
+        return ResponseEntity.ok(productService.getPhotoReviews());
+    }
+
     @PostMapping("/{id}/reviews")
     public ResponseEntity<?> createReview(@PathVariable Long id, @Valid @RequestBody CreateReviewRequest request) {
         return ResponseEntity.status(201).body(productService.createReview(id, request));
