@@ -24,6 +24,6 @@ public class ChatController {
         if (!StringUtils.hasText(message)) {
             return ResponseEntity.badRequest().body(new ChatResponse("메시지를 입력해주세요."));
         }
-        return ResponseEntity.ok(new ChatResponse(chatService.reply(message)));
+        return ResponseEntity.ok(new ChatResponse(chatService.reply(message, request.history())));
     }
 }
