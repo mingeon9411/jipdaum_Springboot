@@ -6,6 +6,7 @@ import com.jipdaum_spring.security.oauth.CustomOAuth2UserService;
 import com.jipdaum_spring.security.oauth.ForceReloginAuthorizationRequestResolver;
 import com.jipdaum_spring.security.oauth.OAuth2FailureHandler;
 import com.jipdaum_spring.security.oauth.OAuth2SuccessHandler;
+import com.jipdaum_spring.security.ratelimit.ChatRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -32,6 +33,7 @@ public class SecurityConfig {
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ChatRateLimitFilter chatRateLimitFilter;
     private final ForceReloginAuthorizationRequestResolver forceReloginAuthorizationRequestResolver;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
@@ -97,7 +99,9 @@ public class SecurityConfig {
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler(oAuth2FailureHandler)
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // JWT 필터 뒤에 붙여야 로그인 사용자를 계정 단위로 구분해 rate limit을 걸 수 있다.
+                .addFilterAfter(chatRateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

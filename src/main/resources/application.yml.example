@@ -75,6 +75,13 @@ app:
   upload-dir: ./uploads
   mail:
     from: dummy@gmail.com
+  chat:
+    rate-limit:
+      # 챗봇(POST /api/shop/chat)은 로그인 사용자는 계정 단위, 비로그인은 IP 단위로 토큰 버킷을 나눠 제한한다.
+      # capacity개까지 버스트 허용, 이후 refill-minutes마다 refill-tokens개씩 greedy하게 재충전.
+      capacity: 10
+      refill-tokens: 10
+      refill-minutes: 1
 
 jwt:
   # Django SIMPLE_JWT의 SIGNING_KEY(=SECRET_KEY, backend/.env)와 반드시 동일해야 토큰이 양쪽에서 호환된다.
