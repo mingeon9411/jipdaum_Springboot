@@ -1,9 +1,11 @@
 package com.jipdaum_spring.service.chat;
 
 import com.jipdaum_spring.dto.product.ProductDetailResponse;
+import com.jipdaum_spring.service.GeminiEmbeddingClient;
 import com.jipdaum_spring.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -11,6 +13,10 @@ import java.util.Map;
 /**
  * 상품 검색은 로그인 여부와 무관하게 공개 정보라 별도 인증 스코핑 없이 그대로 노출한다
  * (기존 GET /api/shop/products/**도 permitAll인 것과 동일한 정책).
+ *
+ * search 파라미터가 있으면 우선 상품 임베딩 인덱스(ProductEmbeddingIndex)로 의미 기반 검색을
+ * 시도한다 — "아늑한 느낌" 같은 상품명에 그대로 없는 질의도 찾을 수 있다. 인덱스가 비어있거나
+ * (gemini.api-key 미설정) 결과가 없으면 기존 LIKE 키워드 검색으로 폴백한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -20,6 +26,8 @@ public class ProductSearchTool implements ChatTool {
     private static final int MAX_RESULTS = 8;
 
     private final ProductService productService;
+    private final GeminiEmbeddingClient embeddingClient;
+    private final ProductEmbeddingIndex embeddingIndex;
 
     @Override
     public String name() {
@@ -47,6 +55,22 @@ public class ProductSearchTool implements ChatTool {
         String search = args.get("search") != null ? args.get("search").toString() : null;
         Long categoryId = ChatToolArgs.asLong(args.get("categoryId"));
 
+        if (StringUtils.hasText(search) && !embeddingIndex.isEmpty()) {
+            List<ProductEmbeddingIndex.ProductSummary> semanticResults = semanticSearch(search, categoryId);
+            if (!semanticResults.isEmpty()) {
+                return semanticResults.stream()
+                        .map(s -> Map.of(
+                                "id", s.id(),
+                                "name", s.name(),
+                                "brand", s.brand() != null ? s.brand() : "",
+                                "basePrice", s.basePrice(),
+                                "categoryName", s.categoryName() != null ? s.categoryName() : ""
+                        ))
+                        .toList();
+            }
+            // 임베딩 검색이 결과를 못 찾으면(질의 임베딩 실패 포함) 아래 키워드 검색으로 폴백한다.
+        }
+
         List<ProductDetailResponse> products = productService.getProducts(search, categoryId);
         return products.stream()
                 .limit(MAX_RESULTS)
@@ -58,5 +82,11 @@ public class ProductSearchTool implements ChatTool {
                         "categoryName", p.categoryName() != null ? p.categoryName() : ""
                 ))
                 .toList();
+    }
+
+    private List<ProductEmbeddingIndex.ProductSummary> semanticSearch(String search, Long categoryId) {
+        return embeddingClient.embed(search, GeminiEmbeddingClient.TaskType.RETRIEVAL_QUERY)
+                .map(queryVector -> embeddingIndex.search(queryVector, categoryId, MAX_RESULTS))
+                .orElse(List.of());
     }
 }
