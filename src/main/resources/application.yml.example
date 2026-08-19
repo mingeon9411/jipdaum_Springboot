@@ -56,6 +56,9 @@ spring:
             client-secret: dummy-naver-client-secret
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            # 네이버 토큰 엔드포인트는 client 인증을 POST 바디로만 받는다(Basic 헤더 기본값 거부).
+            # 카카오와 동일한 제약. 이게 빠지면 인가 코드→토큰 교환 단계에서 네이버가 거부한다.
+            client-authentication-method: client_secret_post
             scope: name, email, profile_image
             client-name: Naver
         provider:
