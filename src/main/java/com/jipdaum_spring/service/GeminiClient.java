@@ -5,13 +5,12 @@ import com.jipdaum_spring.service.chat.ChatTool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.util.retry.Retry;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,9 +20,13 @@ import java.util.stream.Collectors;
 
 /**
  * Google AI Studio의 Gemini generateContent REST API를 호출한다.
- * HCaptchaVerifier와 동일한 정책: api-key가 비어있는 환경(로컬 미설정)에서는 호출 자체를 건너뛰고,
+ * HCaptchaService와 동일한 정책: api-key가 비어있는 환경(로컬 미설정)에서는 호출 자체를 건너뛰고,
  * 호출이 실패하면 예외를 던지지 않고 안전하게 empty를 반환한다 — 호출부(ChatService)가 규칙 기반
  * 답변으로 폴백할 수 있도록.
+ *
+ * 이 앱은 서블릿 기반 blocking MVC라(Security/JPA 전부 non-reactive) WebClient+block() 대신
+ * 동기 클라이언트인 RestClient를 쓴다 — reactive pipeline을 만들었다가 바로 block()으로 되돌리는
+ * 오버헤드가 없고, 이 호출 하나 때문에 webflux 의존성 전체를 끌고 다닐 필요도 없다.
  *
  * tools가 주어지면 Gemini function-calling 루프를 돈다: 모델이 functionCall을 요청하면 로컬에서
  * 해당 ChatTool을 실행하고 결과를 다시 넣어 재호출 — 최종 텍스트가 나올 때까지 반복한다.
@@ -36,6 +39,11 @@ public class GeminiClient {
 
     private static final int MAX_TOOL_CALL_ROUNDS = 4;
 
+    // Gemini가 트래픽 급증 시 503(UNAVAILABLE)이나 429(rate limit)를 종종 반환한다 —
+    // 짧게 1회만 재시도한다(기존 reactor Retry.backoff(1, 500ms)와 동일한 정책).
+    private static final int MAX_HTTP_RETRIES = 1;
+    private static final long RETRY_BACKOFF_MS = 500;
+
     @Value("${gemini.api-key:}")
     private String apiKey;
 
@@ -45,7 +53,9 @@ public class GeminiClient {
     @Value("${gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String baseUrl;
 
-    private final WebClient webClient = WebClient.create();
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(timeoutRequestFactory())
+            .build();
 
     public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
                                       List<ChatTool> tools) {
@@ -114,17 +124,32 @@ public class GeminiClient {
             body.put("tools", toolDeclarations);
         }
 
-        return webClient.post()
-                .uri(baseUrl + "/models/" + model + ":generateContent?key=" + apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(Map.class)
-                // Gemini가 트래픽 급증 시 503(UNAVAILABLE)을 종종 반환한다 — 짧게 2회만 재시도.
-                .retryWhen(Retry.backoff(1, Duration.ofMillis(500)).filter(this::isRetryable))
-                // 정상 응답은 보통 2~4초 안에 온다. 실패 시 사용자를 오래 기다리게 하지 않고
-                // 빨리 규칙 기반 폴백으로 넘어가는 게 30초 만석 대기보다 훨씬 나은 UX다.
-                .block(Duration.ofSeconds(12));
+        String uri = baseUrl + "/models/" + model + ":generateContent?key=" + apiKey;
+
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return restClient.post()
+                        .uri(uri)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .body(Map.class);
+            } catch (RestClientResponseException e) {
+                if (attempt < MAX_HTTP_RETRIES && isRetryable(e)) {
+                    sleepBackoff();
+                    continue;
+                }
+                throw e;
+            }
+        }
+    }
+
+    private void sleepBackoff() {
+        try {
+            Thread.sleep(RETRY_BACKOFF_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private List<Map<String, Object>> executeToolCalls(List<Map<?, ?>> functionCalls, Map<String, ChatTool> toolsByName) {
@@ -165,13 +190,10 @@ public class GeminiClient {
         return declaration;
     }
 
-    private boolean isRetryable(Throwable throwable) {
+    private boolean isRetryable(RestClientResponseException e) {
         // 503(UNAVAILABLE)은 트래픽 급증, 429는 무료 티어 rate limit — 둘 다 짧게 재시도해볼 가치가 있다.
-        if (throwable instanceof WebClientResponseException e) {
-            int status = e.getStatusCode().value();
-            return status == 503 || status == 429;
-        }
-        return false;
+        int status = e.getStatusCode().value();
+        return status == 503 || status == 429;
     }
 
     private String mapRole(String role) {
@@ -197,5 +219,14 @@ public class GeminiClient {
         }
         Map<?, ?> first = (Map<?, ?>) candidates.get(0);
         return (Map<?, ?>) first.get("content");
+    }
+
+    private static SimpleClientHttpRequestFactory timeoutRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);
+        // 정상 응답은 보통 2~4초 안에 온다. 실패 시 사용자를 오래 기다리게 하지 않고 빨리
+        // 규칙 기반 폴백으로 넘어가는 게 30초 만석 대기보다 훨씬 나은 UX다.
+        factory.setReadTimeout(12_000);
+        return factory;
     }
 }

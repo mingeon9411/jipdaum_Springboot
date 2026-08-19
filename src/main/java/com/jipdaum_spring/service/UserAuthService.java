@@ -11,7 +11,7 @@ import com.jipdaum_spring.exception.AuthException;
 import com.jipdaum_spring.exception.FieldValidationException;
 import com.jipdaum_spring.security.CurrentUserProvider;
 import com.jipdaum_spring.security.JipdaumUserProvisioner;
-import com.jipdaum_spring.security.captcha.HCaptchaVerifier;
+import com.jipdaum_spring.security.captcha.HCaptchaService;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -52,7 +52,7 @@ public class UserAuthService {
     private final JipdaumUserProvisioner jipdaumUserProvisioner;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-    private final HCaptchaVerifier hCaptchaVerifier;
+    private final HCaptchaService hCaptchaService;
     private final CurrentUserProvider currentUserProvider;
     private final JavaMailSender mailSender;
 
@@ -61,7 +61,7 @@ public class UserAuthService {
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
-        if (!hCaptchaVerifier.verify(request.recaptchaToken())) {
+        if (!hCaptchaService.verify(request.recaptchaToken())) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
         }
 
@@ -94,7 +94,7 @@ public class UserAuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        if (!hCaptchaVerifier.verify(request.recaptchaToken())) {
+        if (!hCaptchaService.verify(request.recaptchaToken())) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
         }
 

@@ -83,6 +83,12 @@ app:
       refill-tokens: 10
       refill-minutes: 1
 
+hcaptcha:
+  # 회원가입/로그인/챗봇 대화 시작 시 사람인지 검증(HCaptchaService). secret-key가 비어있으면
+  # 검증을 항상 통과시키므로(로컬 개발 편의) 부팅/테스트는 이 값 없이도 문제 없다.
+  secret-key: ''
+  verify-url: https://hcaptcha.com/siteverify
+
 jwt:
   # Django SIMPLE_JWT의 SIGNING_KEY(=SECRET_KEY, backend/.env)와 반드시 동일해야 토큰이 양쪽에서 호환된다.
   secret: '***REMOVED_SECRET***'
