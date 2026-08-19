@@ -53,6 +53,12 @@ public class GeminiClient {
     @Value("${gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String baseUrl;
 
+    // gemini-3.7-flash는 "thinking" 모드가 있는 모델이라 tool 선언(search_products,
+    // get_product_detail)까지 붙으면 12초를 넘기는 경우가 실제로 있었다(라이브 테스트로 확인,
+    // SocketTimeoutException 발생). 25초로 넉넉히 잡되, 그래도 실패하면 규칙 기반으로 폴백한다.
+    // (@Value 필드는 생성자 완료 후 주입되므로, 필드 초기화 시점에 바로 못 쓰는 상수로 둔다.)
+    private static final int READ_TIMEOUT_MS = 25_000;
+
     private final RestClient restClient = RestClient.builder()
             .requestFactory(timeoutRequestFactory())
             .build();
@@ -224,9 +230,7 @@ public class GeminiClient {
     private static SimpleClientHttpRequestFactory timeoutRequestFactory() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000);
-        // 정상 응답은 보통 2~4초 안에 온다. 실패 시 사용자를 오래 기다리게 하지 않고 빨리
-        // 규칙 기반 폴백으로 넘어가는 게 30초 만석 대기보다 훨씬 나은 UX다.
-        factory.setReadTimeout(12_000);
+        factory.setReadTimeout(READ_TIMEOUT_MS);
         return factory;
     }
 }

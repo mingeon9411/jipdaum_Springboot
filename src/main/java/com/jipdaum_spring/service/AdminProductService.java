@@ -6,6 +6,8 @@ import com.jipdaum_spring.domain.product.Product;
 import com.jipdaum_spring.domain.product.ProductRepository;
 import com.jipdaum_spring.dto.product.ProductCreateRequest;
 import com.jipdaum_spring.dto.product.ProductResponse;
+import com.jipdaum_spring.service.chat.ProductEmbeddingIndex;
+import com.jipdaum_spring.service.chat.ProductEmbeddingIndexInitializer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,8 @@ public class AdminProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final GeminiEmbeddingClient embeddingClient;
+    private final ProductEmbeddingIndex embeddingIndex;
 
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
@@ -34,6 +38,7 @@ public class AdminProductService {
                 .thumbnailUrl(request.thumbnailUrl())
                 .build();
         productRepository.save(product);
+        reindex(product);
         return ProductResponse.from(product);
     }
 
@@ -43,12 +48,25 @@ public class AdminProductService {
         Category category = findCategory(request.categoryId());
         product.update(category, request.name(), request.brand(), request.basePrice(),
                 request.description(), request.thumbnailUrl());
+        reindex(product);
         return ProductResponse.from(product);
     }
 
     @Transactional
     public void delete(Long productId) {
         productRepository.delete(findProduct(productId));
+        embeddingIndex.remove(productId);
+    }
+
+    /**
+     * 챗봇 상품 검색용 임베딩 색인을 이 상품 한 건만 갱신한다(전체 재색인 없이). gemini.api-key가
+     * 없으면 embed()가 빈 값을 반환하므로 그냥 조용히 스킵된다 — 상품 저장 자체는 항상 성공한다.
+     */
+    private void reindex(Product product) {
+        String text = ProductEmbeddingIndexInitializer.toEmbeddingText(product);
+        embeddingClient.embed(text, GeminiEmbeddingClient.TaskType.RETRIEVAL_DOCUMENT)
+                .ifPresent(vector -> embeddingIndex.upsert(
+                        product.getId(), vector, ProductEmbeddingIndex.ProductSummary.from(product)));
     }
 
     public Page<ProductResponse> getAll(Pageable pageable) {
