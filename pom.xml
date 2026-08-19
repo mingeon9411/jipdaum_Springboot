@@ -87,6 +87,18 @@
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
+			<!-- 챗봇 등 공개 API의 rate limit(요청 제한)에 사용. -->
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.1</version>
+		</dependency>
+		<dependency>
+			<!-- IP/사용자별 버킷을 유효기간·최대개수 제한과 함께 캐싱하기 위함(무제한 메모리 증가 방지).
+			     버전은 spring-boot-starter-parent BOM이 관리한다. -->
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
