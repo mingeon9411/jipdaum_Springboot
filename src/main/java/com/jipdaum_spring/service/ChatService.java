@@ -1,12 +1,41 @@
 package com.jipdaum_spring.service;
 
+import com.jipdaum_spring.dto.chat.ChatMessage;
+import com.jipdaum_spring.service.chat.ChatTool;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ChatService {
+
+    // 프론트가 매 요청마다 통째로 보내는 history를 이만큼만 사용한다 (payload/비용 방어).
+    private static final int MAX_HISTORY_TURNS = 20;
+
+    private static final String SYSTEM_PROMPT = """
+            당신은 '집다움'이라는 인테리어/리빙 쇼핑몰의 고객센터 AI 어시스턴트입니다.
+            친절하고 간결한 한국어로, 다음 정책 정보를 근거로 답변하세요:
+            - 배송: 평균 2~3 영업일 소요, 전 상품 무료배송
+            - 반품/교환: 상품 수령 후 7일 이내, 마이페이지 > 주문내역에서 신청
+            - 결제수단: 카카오페이, 네이버페이
+            - 쿠폰: 마이페이지 > 쿠폰에서 확인 및 결제 시 적용
+            - 회원 등급: MARU → DAUM → JIPUM 순, 구매 금액에 따라 상승
+            - 적립금: 구매 금액의 1% 적립, 다음 구매 시 사용 가능
+            - 고객센터: 평일 10:00~17:00 운영, 마이페이지 > 1:1 문의로 접수
+            상품의 가격/브랜드/설명/카테고리 등 실제 데이터가 필요한 질문에는 반드시 제공된 도구
+            (search_products, get_product_detail)로 조회해서 정확한 정보로 답변하세요. 추측하지 마세요.
+            아직 주문 조회나 로그인 연동은 지원하지 않으니, 개인화된 정보가 필요한 질문에는
+            마이페이지 이용을 안내하세요. 집다움과 무관한 질문에는 정중히 답변할 수 없다고 안내하세요.
+            """;
+
+    private final GeminiClient geminiClient;
+    private final List<ChatTool> chatTools;
 
     private record Rule(List<String> keywords, List<String> replies) {
     }
@@ -90,7 +119,27 @@ public class ChatService {
             "죄송해요, 제가 아직 그 부분은 잘 모르겠어요 😅 1:1 문의로 남겨주시면 담당자가 빠르게 답변해 드립니다."
     );
 
-    public String reply(String message) {
+    /**
+     * history는 프론트가 들고 있는 이전 대화 턴 (서버 DB에 저장하지 않는 stateless 멀티턴).
+     * Gemini 호출이 실패하거나 api-key가 설정되지 않은 환경에서는 기존 규칙 기반 답변으로 폴백한다.
+     */
+    public String reply(String message, List<ChatMessage> history) {
+        List<ChatMessage> trimmedHistory = history == null
+                ? List.of()
+                : history.stream()
+                        .skip(Math.max(0, history.size() - MAX_HISTORY_TURNS))
+                        .toList();
+
+        Optional<String> llmReply = geminiClient.generate(SYSTEM_PROMPT, trimmedHistory, message, chatTools);
+        if (llmReply.isPresent()) {
+            return llmReply.get();
+        }
+
+        log.info("Gemini 응답을 받지 못해 규칙 기반 답변으로 폴백합니다.");
+        return ruleBasedReply(message);
+    }
+
+    private String ruleBasedReply(String message) {
         String lower = message.toLowerCase();
         for (Rule rule : RULES) {
             boolean matched = rule.keywords().stream().anyMatch(lower::contains);
