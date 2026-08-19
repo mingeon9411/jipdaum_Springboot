@@ -6,6 +6,7 @@ import com.jipdaum_spring.security.oauth.CustomOAuth2UserService;
 import com.jipdaum_spring.security.oauth.ForceReloginAuthorizationRequestResolver;
 import com.jipdaum_spring.security.oauth.OAuth2FailureHandler;
 import com.jipdaum_spring.security.oauth.OAuth2SuccessHandler;
+import com.jipdaum_spring.security.oauth.SocialLoginCaptchaFilter;
 import com.jipdaum_spring.security.ratelimit.ChatRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +17,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -34,6 +36,7 @@ public class SecurityConfig {
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ChatRateLimitFilter chatRateLimitFilter;
+    private final SocialLoginCaptchaFilter socialLoginCaptchaFilter;
     private final ForceReloginAuthorizationRequestResolver forceReloginAuthorizationRequestResolver;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
@@ -73,7 +76,7 @@ public class SecurityConfig {
                         restAuthenticationEntryPoint, new AntPathRequestMatcher("/api/**")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**",
-                                "/api/auth/refresh", "/api/auth/social-exchange",
+                                "/api/auth/refresh", "/api/auth/social-exchange", "/api/auth/social-captcha",
                                 "/api/users/register", "/api/users/login",
                                 "/api/users/me", "/api/users/nickname-check").permitAll()
                         // 업로드된 리뷰 사진 등은 정적 파일 서빙이라 비로그인 방문자도 볼 수 있어야 한다.
@@ -101,7 +104,10 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // JWT 필터 뒤에 붙여야 로그인 사용자를 계정 단위로 구분해 rate limit을 걸 수 있다.
-                .addFilterAfter(chatRateLimitFilter, JwtAuthenticationFilter.class);
+                .addFilterAfter(chatRateLimitFilter, JwtAuthenticationFilter.class)
+                // OAuth2AuthorizationRequestRedirectFilter가 /oauth2/authorization/{id}를 가로채
+                // provider로 리다이렉트해버리므로, 그 전에 ticket을 검사해야 한다.
+                .addFilterBefore(socialLoginCaptchaFilter, OAuth2AuthorizationRequestRedirectFilter.class);
 
         return http.build();
     }

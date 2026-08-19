@@ -33,8 +33,13 @@ public class HCaptchaService {
             .requestFactory(timeoutRequestFactory())
             .build();
 
+    /** secret key가 설정되지 않은 환경(로컬 개발)에서는 캡차 자체가 꺼져 있다고 본다. */
+    public boolean isEnabled() {
+        return StringUtils.hasText(secretKey);
+    }
+
     public boolean verify(String token) {
-        if (!StringUtils.hasText(secretKey)) {
+        if (!isEnabled()) {
             return true;
         }
         if (!StringUtils.hasText(token)) {
