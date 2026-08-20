@@ -55,6 +55,7 @@ public class GeminiEmbeddingClient {
             Map<?, ?> response = restClient.post()
                     .uri(baseUrl + "/models/" + model + ":embedContent?key=" + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
                     .body(Map.class);
@@ -88,6 +89,7 @@ public class GeminiEmbeddingClient {
             Map<?, ?> response = restClient.post()
                     .uri(baseUrl + "/models/" + model + ":batchEmbedContents?key=" + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
                     .body(Map.of("requests", requests))
                     .retrieve()
                     .body(Map.class);
