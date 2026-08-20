@@ -1,5 +1,6 @@
 package com.jipdaum_spring.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -41,6 +42,8 @@ public class GeminiEmbeddingClient {
             .requestFactory(timeoutRequestFactory())
             .build();
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public Optional<float[]> embed(String text, TaskType taskType) {
         if (!StringUtils.hasText(apiKey) || !StringUtils.hasText(text)) {
             return Optional.empty();
@@ -52,16 +55,18 @@ public class GeminiEmbeddingClient {
                     "taskType", taskType.name()
             );
 
-            Map<?, ?> response = restClient.post()
+            // GeminiClient와 동일한 이유로 Content-Type과 무관하게 String으로 받아 직접 파싱한다.
+            String responseBody = restClient.post()
                     .uri(baseUrl + "/models/" + model + ":embedContent?key=" + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .body(Map.class);
+                    .body(String.class);
+            Map<?, ?> response = objectMapper.readValue(responseBody, Map.class);
 
             return response != null ? extractValues((Map<?, ?>) response.get("embedding")) : Optional.empty();
-        } catch (RestClientException e) {
+        } catch (RestClientException | com.fasterxml.jackson.core.JsonProcessingException e) {
             log.warn("Gemini 임베딩 호출 실패", e);
             return Optional.empty();
         }
@@ -86,13 +91,14 @@ public class GeminiEmbeddingClient {
                     ))
                     .toList();
 
-            Map<?, ?> response = restClient.post()
+            String responseBody = restClient.post()
                     .uri(baseUrl + "/models/" + model + ":batchEmbedContents?key=" + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(Map.of("requests", requests))
                     .retrieve()
-                    .body(Map.class);
+                    .body(String.class);
+            Map<?, ?> response = objectMapper.readValue(responseBody, Map.class);
 
             List<?> embeddings = response != null ? (List<?>) response.get("embeddings") : null;
             if (embeddings == null || embeddings.size() != texts.size()) {
@@ -102,7 +108,7 @@ public class GeminiEmbeddingClient {
             return embeddings.stream()
                     .map(e -> extractValues((Map<?, ?>) e))
                     .toList();
-        } catch (RestClientException e) {
+        } catch (RestClientException | com.fasterxml.jackson.core.JsonProcessingException e) {
             log.warn("Gemini 배치 임베딩 호출 실패", e);
             return texts.stream().map(t -> Optional.<float[]>empty()).toList();
         }
