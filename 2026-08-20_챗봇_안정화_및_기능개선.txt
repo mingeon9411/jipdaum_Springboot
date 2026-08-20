@@ -1,0 +1,56 @@
+
+⭐ 챗봇 안정화 및 기능 개선 (2026-08-20)
+
+✅ hCaptcha 게이트 제거
+
+➡️ invisible hCaptcha가 자동 통과 안 될 때 챌린지 팝업이 뜨면서 UX가 나빠지는 문제
+➡️ 챗봇 새 대화 시작 시 hCaptcha 검증 제거
+➡️ 봇 남용 방어는 ChatRateLimitFilter(Bucket4j, IP/계정당 분당 제한)가 계속 담당
+
+
+✅ Gemini API 응답 파싱 버그 수정 (유료 티어 전환 후 발견)
+
+➡️ GeminiClient 요청에 Accept: application/json 헤더 명시
+➡️ GeminiEmbeddingClient(embedContent/batchEmbedContents) 호출에도 동일하게 Accept 헤더 추가
+➡️ 그래도 tools 포함된 큰 요청에서는 Gemini가 Content-Type을 application/octet-stream으로
+   잘못 내려주는 케이스 발견 (EC2에서 원시 curl로 확인 — 바디는 항상 유효한 JSON)
+➡️ .body(Map.class) 대신 .body(String.class)로 받아 ObjectMapper로 직접 JSON 파싱하도록 변경
+   — Content-Type 기반 컨버터 선택에 더 이상 의존하지 않음
+➡️ 원인 파악: 무료 할당량 소진(429)에 가려 있다가, 유료 티어 전환 후 실제 200 응답을 받으면서 드러남
+
+
+✅ 챗봇 상품 검색에 진열(collection) 스코프 추가 — 한국관 지원
+
+➡️ 메인 진열과 한국관 진열이 카테고리명을 공유해서(둘 다 소파/테이블/조명...) 카테고리만으로는
+   어느 진열 소속인지 구분 불가
+➡️ Product.collection ("main" | "korean_hall", Django 마이그레이션과 매칭) 기준으로
+   search_products가 검색 범위를 좁히도록 변경
+➡️ GeminiClient.generate()에 toolContext 파라미터 추가 — 모델이 아니라 호출부가 고정하는
+   도구 인자(functionDeclaration에 없는 값)를 주입 가능하게 함
+➡️ ChatService.reply(message, history, channel) — channel="korean-hall"이면
+   collection="korean_hall", 그 외에는 "main"을 toolContext로 주입
+➡️ ChatRequest에 channel 필드 추가, ChatController가 그대로 전달
+➡️ ProductRepository / ProductService / ProductEmbeddingIndex(임베딩 검색)까지
+   collection 필터를 일관되게 지원하도록 확장
+
+
+✅ 챗봇 응답 지연 개선 — 불필요한 도구 호출 라운드 축소
+
+➡️ "소파 추천해줘" 한 번에 상품별 상세조회를 반복 호출하면서 4라운드를 꽉 채워
+   30~60초씩 걸리던 문제
+➡️ 프롬프트에 "search_products 결과(이름/브랜드/가격/카테고리)만으로 답변하고, 고객이
+   특정 상품을 콕 집어 물을 때만 get_product_detail을 쓰라"는 지침 추가
+   — 정상 흐름이면 검색 1라운드 + 답변 1라운드로 종료
+➡️ MAX_TOOL_CALL_ROUNDS 4 → 3으로 축소
+   (2까지 낮추면 "상품 상세를 콕 집어 질문"하는 케이스가 검색+상세조회+답변=3라운드로
+   한도를 초과해 폴백되므로, 에러 없이 갈 수 있는 최소치로 3을 남김)
+
+
+⭐ 관련 커밋
+
+✅ 2401da3  fix: 챗봇 hCaptcha 게이트 제거
+✅ 20d9e49  fix: Gemini API 호출에 Accept: application/json 헤더 명시
+✅ 25d53ac  fix: 임베딩 API 호출에도 Accept: application/json 헤더 추가
+✅ a17172c  fix: Gemini 응답을 Content-Type 무관하게 문자열로 받아 직접 JSON 파싱
+✅ df3c8bf  feat: 챗봇 상품 검색에 진열(collection) 스코프 추가 — 한국관 지원
+✅ 1fe06e5  perf: 챗봇 응답 지연 개선 — 불필요한 도구 호출 라운드 축소
