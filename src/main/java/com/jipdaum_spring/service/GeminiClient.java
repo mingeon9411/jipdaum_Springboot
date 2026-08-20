@@ -137,6 +137,7 @@ public class GeminiClient {
                 return restClient.post()
                         .uri(uri)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
                         .body(body)
                         .retrieve()
                         .body(Map.class);
