@@ -54,9 +54,13 @@ public class ProductSearchTool implements ChatTool {
     public Object execute(Map<String, Object> args) {
         String search = args.get("search") != null ? args.get("search").toString() : null;
         Long categoryId = ChatToolArgs.asLong(args.get("categoryId"));
+        // "collection"은 Gemini에게 노출된 파라미터가 아니다 — 모델이 정하는 게 아니라, 어느
+        // 페이지(채널)에서 온 요청인지에 따라 GeminiClient가 고정으로 주입하는 값이다
+        // (ChatService/GeminiClient의 toolContext 참고).
+        String collection = args.get("collection") != null ? args.get("collection").toString() : null;
 
         if (StringUtils.hasText(search) && !embeddingIndex.isEmpty()) {
-            List<ProductEmbeddingIndex.ProductSummary> semanticResults = semanticSearch(search, categoryId);
+            List<ProductEmbeddingIndex.ProductSummary> semanticResults = semanticSearch(search, categoryId, collection);
             if (!semanticResults.isEmpty()) {
                 return semanticResults.stream()
                         .map(s -> Map.of(
@@ -71,7 +75,7 @@ public class ProductSearchTool implements ChatTool {
             // 임베딩 검색이 결과를 못 찾으면(질의 임베딩 실패 포함) 아래 키워드 검색으로 폴백한다.
         }
 
-        List<ProductDetailResponse> products = productService.getProducts(search, categoryId);
+        List<ProductDetailResponse> products = productService.getProducts(search, categoryId, collection);
         return products.stream()
                 .limit(MAX_RESULTS)
                 .map(p -> Map.of(
@@ -84,9 +88,9 @@ public class ProductSearchTool implements ChatTool {
                 .toList();
     }
 
-    private List<ProductEmbeddingIndex.ProductSummary> semanticSearch(String search, Long categoryId) {
+    private List<ProductEmbeddingIndex.ProductSummary> semanticSearch(String search, Long categoryId, String collection) {
         return embeddingClient.embed(search, GeminiEmbeddingClient.TaskType.RETRIEVAL_QUERY)
-                .map(queryVector -> embeddingIndex.search(queryVector, categoryId, MAX_RESULTS))
+                .map(queryVector -> embeddingIndex.search(queryVector, categoryId, collection, MAX_RESULTS))
                 .orElse(List.of());
     }
 }

@@ -69,6 +69,16 @@ public class GeminiClient {
 
     public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
                                       List<ChatTool> tools) {
+        return generate(systemPrompt, history, userMessage, tools, Map.of());
+    }
+
+    /**
+     * toolContext는 Gemini에게 노출되지 않는(functionDeclaration parameters에 없는) 고정 인자다.
+     * 모델이 도구를 호출하면 그 인자에 강제로 덮어써서 넣는다 — 예: 어느 페이지(채널)의 채팅인지에
+     * 따라 search_products의 검색 범위(collection)를 모델이 아니라 호출부가 결정하고 싶을 때 쓴다.
+     */
+    public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
+                                      List<ChatTool> tools, Map<String, Object> toolContext) {
         if (!StringUtils.hasText(apiKey)) {
             log.warn("gemini.api-key가 설정되지 않아 LLM 호출을 건너뜁니다.");
             return Optional.empty();
@@ -114,7 +124,7 @@ public class GeminiClient {
 
                 // 모델의 functionCall 턴(thoughtSignature 포함)을 그대로 히스토리에 echo해야 다음 호출이 유효하다.
                 contents.add(toContent("model", parts));
-                contents.add(toContent("user", executeToolCalls(functionCalls, toolsByName)));
+                contents.add(toContent("user", executeToolCalls(functionCalls, toolsByName, toolContext)));
             }
         } catch (Exception e) {
             log.warn("Gemini API 호출 실패", e);
@@ -170,14 +180,18 @@ public class GeminiClient {
         }
     }
 
-    private List<Map<String, Object>> executeToolCalls(List<Map<?, ?>> functionCalls, Map<String, ChatTool> toolsByName) {
+    private List<Map<String, Object>> executeToolCalls(List<Map<?, ?>> functionCalls, Map<String, ChatTool> toolsByName,
+                                                         Map<String, Object> toolContext) {
         List<Map<String, Object>> responseParts = new ArrayList<>();
         for (Map<?, ?> callPart : functionCalls) {
             Map<?, ?> functionCall = (Map<?, ?>) callPart.get("functionCall");
             String name = String.valueOf(functionCall.get("name"));
             Object rawArgs = functionCall.get("args");
             @SuppressWarnings("unchecked")
-            Map<String, Object> args = rawArgs != null ? (Map<String, Object>) rawArgs : Map.of();
+            Map<String, Object> modelArgs = rawArgs != null ? (Map<String, Object>) rawArgs : Map.of();
+            // toolContext가 모델이 보낸 값을 덮어쓴다 — 모델은 애초에 이 키들을 스키마에서 본 적도 없다.
+            Map<String, Object> args = new LinkedHashMap<>(modelArgs);
+            args.putAll(toolContext);
 
             Object result;
             ChatTool tool = toolsByName.get(name);
