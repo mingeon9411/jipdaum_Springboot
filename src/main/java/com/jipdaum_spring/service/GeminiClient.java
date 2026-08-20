@@ -1,5 +1,7 @@
 package com.jipdaum_spring.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jipdaum_spring.dto.chat.ChatMessage;
 import com.jipdaum_spring.service.chat.ChatTool;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,8 @@ public class GeminiClient {
     private final RestClient restClient = RestClient.builder()
             .requestFactory(timeoutRequestFactory())
             .build();
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
                                       List<ChatTool> tools) {
@@ -134,19 +138,26 @@ public class GeminiClient {
 
         for (int attempt = 0; ; attempt++) {
             try {
-                return restClient.post()
+                // .body(Map.class)로 바로 받으면 Spring이 응답 Content-Type을 보고 컨버터를 고르는데,
+                // Gemini가 (특히 tools 포함 요청에서) 실제로는 JSON 본문을 주면서도 Content-Type을
+                // application/octet-stream으로 잘못 내려주는 경우가 있어 역직렬화가 실패했다.
+                // Content-Type과 무관하게 항상 String으로 받아 직접 JSON 파싱하도록 우회한다.
+                String responseBody = restClient.post()
                         .uri(uri)
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .body(body)
                         .retrieve()
-                        .body(Map.class);
+                        .body(String.class);
+                return objectMapper.readValue(responseBody, Map.class);
             } catch (RestClientResponseException e) {
                 if (attempt < MAX_HTTP_RETRIES && isRetryable(e)) {
                     sleepBackoff();
                     continue;
                 }
                 throw e;
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Gemini 응답 JSON 파싱 실패", e);
             }
         }
     }
