@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -155,18 +156,32 @@ public class ChatService {
             "죄송해요, 제가 아직 그 부분은 잘 모르겠어요 😅 1:1 문의로 남겨주시면 담당자가 빠르게 답변해 드립니다."
     );
 
+    private static final String CHANNEL_KOREAN_HALL = "korean-hall";
+
     /**
      * history는 프론트가 들고 있는 이전 대화 턴 (서버 DB에 저장하지 않는 stateless 멀티턴).
      * Gemini 호출이 실패하거나 api-key가 설정되지 않은 환경에서는 기존 규칙 기반 답변으로 폴백한다.
      */
     public String reply(String message, List<ChatMessage> history) {
+        return reply(message, history, null);
+    }
+
+    /**
+     * channel은 프론트 페이지 문맥이다("korean-hall"이면 한국관 페이지, 그 외/null이면 기본 쇼핑몰).
+     * search_products가 그 문맥에 맞는 상품 진열(collection)만 검색하도록 고정 인자로 주입한다 —
+     * 모델이 스스로 진열을 고르게 두지 않는다(카테고리명이 두 진열에서 겹쳐서 혼동 소지가 있다).
+     */
+    public String reply(String message, List<ChatMessage> history, String channel) {
         List<ChatMessage> trimmedHistory = history == null
                 ? List.of()
                 : history.stream()
                         .skip(Math.max(0, history.size() - MAX_HISTORY_TURNS))
                         .toList();
 
-        Optional<String> llmReply = geminiClient.generate(SYSTEM_PROMPT, trimmedHistory, message, chatTools);
+        String collection = CHANNEL_KOREAN_HALL.equals(channel) ? "korean_hall" : "main";
+        Map<String, Object> toolContext = Map.of("collection", collection);
+
+        Optional<String> llmReply = geminiClient.generate(SYSTEM_PROMPT, trimmedHistory, message, chatTools, toolContext);
         if (llmReply.isPresent()) {
             return llmReply.get();
         }

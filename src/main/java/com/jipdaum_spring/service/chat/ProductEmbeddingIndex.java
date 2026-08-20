@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ProductEmbeddingIndex {
 
     public record ProductSummary(
-            Long id, String name, String brand, Integer basePrice, String categoryName, Long categoryId
+            Long id, String name, String brand, Integer basePrice, String categoryName, Long categoryId, String collection
     ) {
         public static ProductSummary from(Product p) {
             return new ProductSummary(
@@ -26,7 +26,8 @@ public class ProductEmbeddingIndex {
                     p.getBrand(),
                     p.getBasePrice(),
                     p.getCategory() != null ? p.getCategory().getName() : null,
-                    p.getCategory() != null ? p.getCategory().getId() : null
+                    p.getCategory() != null ? p.getCategory().getId() : null,
+                    p.getCollection()
             );
         }
     }
@@ -52,10 +53,14 @@ public class ProductEmbeddingIndex {
         return entries.size();
     }
 
-    /** 코사인 유사도 상위 topK. categoryId가 주어지면 그 카테고리 상품만 대상으로 한다. */
-    public List<ProductSummary> search(float[] queryVector, Long categoryId, int topK) {
+    /**
+     * 코사인 유사도 상위 topK. categoryId가 주어지면 그 카테고리 상품만, collection이 주어지면
+     * 그 진열(메인/한국관) 상품만 대상으로 한다.
+     */
+    public List<ProductSummary> search(float[] queryVector, Long categoryId, String collection, int topK) {
         return entries.values().stream()
                 .filter(e -> categoryId == null || categoryId.equals(e.summary().categoryId()))
+                .filter(e -> collection == null || collection.equals(e.summary().collection()))
                 .map(e -> Map.entry(e.summary(), cosineSimilarity(queryVector, e.vector())))
                 .sorted(Map.Entry.<ProductSummary, Float>comparingByValue().reversed())
                 .limit(topK)
