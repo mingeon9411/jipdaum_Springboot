@@ -39,7 +39,11 @@ import java.util.stream.Collectors;
 @Component
 public class GeminiClient {
 
-    private static final int MAX_TOOL_CALL_ROUNDS = 4;
+    // 프롬프트에서 "검색/상세조회는 꼭 필요할 때만, 한 번씩만"을 지시해뒀다 — 정상적인 흐름이면
+    // search_products 1라운드 + 답변 1라운드로 끝난다. 그래도 고객이 특정 상품 상세를 콕 집어
+    // 물어보는 경우를 위해 get_product_detail 1회 분량의 여유(3라운드째)를 남겨둔다. 2로 더
+    // 낮추면 그 경우가 라운드 한도 초과로 폴백돼버린다.
+    private static final int MAX_TOOL_CALL_ROUNDS = 3;
 
     // Gemini가 트래픽 급증 시 503(UNAVAILABLE)이나 429(rate limit)를 종종 반환한다 —
     // 짧게 1회만 재시도한다(기존 reactor Retry.backoff(1, 500ms)와 동일한 정책).
