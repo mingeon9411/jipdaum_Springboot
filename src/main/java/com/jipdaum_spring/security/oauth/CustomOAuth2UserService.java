@@ -111,10 +111,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             log.warn("소셜 로그인 부가 정보(users 테이블) 저장 실패 — 로그인은 계속 진행 (email={})", email, e);
         }
 
-        // JIPDAUM_USER(Django 공유 테이블)에도 사용자 존재 보장 — Order FK에 필요
-        jipdaumUserProvisioner.ensureExists(
+        // JIPDAUM_USER(Django 공유 테이블)에도 사용자 존재 보장 — Order FK에 필요.
+        // 반환값은 이 이메일로 JIPDAUM_USER 행이 방금 새로 생성됐는지 여부(=진짜 신규가입인지) —
+        // 이메일/비밀번호로 이미 가입돼 있던 계정을 소셜로 처음 연결한 경우도 false로 잡힌다.
+        boolean isNewUser = jipdaumUserProvisioner.ensureExists(
                 email, registrationId + "_" + providerId, name != null ? name : "소셜사용자");
 
-        return new CustomOAuth2User(oAuth2User, email);
+        return new CustomOAuth2User(oAuth2User, email, isNewUser);
     }
 }

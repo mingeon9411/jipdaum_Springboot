@@ -44,8 +44,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // 프론트엔드는 이 code를 POST /api/auth/social-exchange 로 보내 실제 토큰을 받아야 한다.
         String code = socialLoginCodeStore.issue(email);
 
+        // 이미 있던 계정으로 로그인한 경우("가입하기" 버튼을 눌렀지만 실제로는 기존 회원인 경우 포함)
+        // 프론트가 "이미 가입된 회원입니다" 안내를 띄울 수 있도록 신호를 실어 보낸다.
+        boolean existingAccount = !oAuth2User.isNewUser();
+
         String redirectUrl = frontendUrl + "/social-callback?code=" + code
-                + (reactivated ? "&reactivated=true" : "");
+                + (reactivated ? "&reactivated=true" : "")
+                + (existingAccount ? "&existing=true" : "");
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 }

@@ -21,23 +21,30 @@ public class JipdaumUserProvisioner {
     private final JipdaumUserRepository jipdaumUserRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    /** email로 JIPDAUM_USER 존재를 보장한다. 이미 있으면(email 또는 username 대소문자 무시 일치) 아무것도 하지 않는다. */
+    /**
+     * email로 JIPDAUM_USER 존재를 보장한다. 이미 있으면(email 또는 username 대소문자 무시 일치)
+     * 아무것도 하지 않고 false를 반환 — 소셜 로그인이 "방금 새로 가입한 것"인지 "이미 있던 계정으로
+     * 로그인한 것"인지 구분하는 데 이 반환값을 쓴다(OAuth2SuccessHandler 참고).
+     */
     @Transactional
-    public void ensureExists(String email, String usernameHint, String nickname) {
+    public boolean ensureExists(String email, String usernameHint, String nickname) {
         if (jipdaumUserRepository.findByEmail(email).isPresent()
                 || !jipdaumUserRepository.findAllByUsernameIgnoreCase(email).isEmpty()) {
-            return;
+            return false;
         }
 
         try {
             insert(usernameHint, "!" + usernameHint, email, nickname, false);
+            return true;
         } catch (DataAccessException e) {
             // username unique 제약 충돌 시 suffix를 붙여 한 번 더 시도한다.
             String fallbackUsername = usernameHint + "_" + (System.currentTimeMillis() % 10000);
             try {
                 insert(fallbackUsername, "!" + fallbackUsername, email, nickname, false);
+                return true;
             } catch (DataAccessException retryFailure) {
                 log.warn("JIPDAUM_USER 자동 생성 실패 (email={})", email, retryFailure);
+                return false;
             }
         }
     }
