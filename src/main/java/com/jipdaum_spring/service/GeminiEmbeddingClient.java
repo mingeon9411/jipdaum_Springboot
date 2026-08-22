@@ -56,8 +56,11 @@ public class GeminiEmbeddingClient {
             );
 
             // GeminiClient와 동일한 이유로 Content-Type과 무관하게 String으로 받아 직접 파싱한다.
+            // API 키는 쿼리스트링이 아니라 헤더로 보낸다 — 타임아웃 예외 메시지에 요청 URI가
+            // 그대로 실려 로그에 키가 남는 걸 막기 위함(GeminiClient와 동일한 이유).
             String responseBody = restClient.post()
-                    .uri(baseUrl + "/models/" + model + ":embedContent?key=" + apiKey)
+                    .uri(baseUrl + "/models/" + model + ":embedContent")
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(body)
@@ -92,7 +95,8 @@ public class GeminiEmbeddingClient {
                     .toList();
 
             String responseBody = restClient.post()
-                    .uri(baseUrl + "/models/" + model + ":batchEmbedContents?key=" + apiKey)
+                    .uri(baseUrl + "/models/" + model + ":batchEmbedContents")
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(Map.of("requests", requests))

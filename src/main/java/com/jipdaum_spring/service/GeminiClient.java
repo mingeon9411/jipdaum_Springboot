@@ -148,7 +148,9 @@ public class GeminiClient {
             body.put("tools", toolDeclarations);
         }
 
-        String uri = baseUrl + "/models/" + model + ":generateContent?key=" + apiKey;
+        // API 키는 쿼리스트링(?key=)이 아니라 헤더로 보낸다 — 쿼리스트링에 두면 타임아웃 등
+        // I/O 예외(ResourceAccessException) 메시지에 요청 URI 전체가 그대로 실려 로그에 키가 남는다.
+        String uri = baseUrl + "/models/" + model + ":generateContent";
 
         for (int attempt = 0; ; attempt++) {
             try {
@@ -158,6 +160,7 @@ public class GeminiClient {
                 // Content-Type과 무관하게 항상 String으로 받아 직접 JSON 파싱하도록 우회한다.
                 String responseBody = restClient.post()
                         .uri(uri)
+                        .header("x-goog-api-key", apiKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .body(body)

@@ -1,0 +1,33 @@
+
+⭐ 보안 점검 및 Gemini API 키 로그 노출 수정 (2026-08-22)
+
+✅ 자체 보안 리뷰 (2b2d579..c463618 pull 반영분 대상)
+
+➡️ hCaptcha 소셜로그인 필터, ChatRateLimitFilter, Gemini 챗봇 연동(GeminiClient/
+   GeminiEmbeddingClient), SecurityConfig/AuthController/Product 변경분을 대상으로
+   서브에이전트 2단계(취약점 식별 → 오탐 필터링) 리뷰 진행
+➡️ SQL 인젝션, 인증 우회, 필터 체인 순서 문제, 권한 상승, XXE/역직렬화 등은 발견되지 않음
+➡️ toolContext(채널 스코프)가 모델이 위조한 인자보다 항상 우선 적용됨을 확인 —
+   챗봇 도구 호출로 다른 진열(collection) 데이터를 끌어올 수 없음
+➡️ ChatRateLimitFilter의 X-Forwarded-For 무조건 신뢰는 레이트리밋 우회 범주라 스코프 제외
+   (인증/데이터 접근에는 영향 없음)
+
+
+✅ [확정] Gemini API 키가 타임아웃 시 로그에 평문 노출 (신뢰도 8/10)
+
+➡️ GeminiClient/GeminiEmbeddingClient가 API 키를 URL 쿼리스트링(?key=...)으로 전송
+➡️ Spring RestClient가 커넥션/읽기 타임아웃을 ResourceAccessException으로 감싸는데,
+   이 예외 메시지 포맷("I/O error on ... request for \"<URI>\"")에 요청 URI 전체가
+   그대로 포함됨 — 즉 쿼리스트링의 API 키까지 포함
+➡️ 두 클라이언트 모두 이 예외를 log.warn(msg, e)로 그대로 찍고 있어 타임아웃 발생 시
+   API 키가 애플리케이션 로그에 평문으로 남음
+➡️ 이론적 이슈가 아님: GeminiClient 주석에 라이브 테스트 중 실제 SocketTimeoutException이
+   발생해 읽기 타임아웃을 25초로 늘린 이력이 남아있음 — 운영 중 흔히 재현되는 경로
+➡️ 수정: API 키를 쿼리스트링 대신 x-goog-api-key 헤더로 전송하도록 변경
+   (generateContent, embedContent, batchEmbedContents 3개 엔드포인트 전부)
+➡️ mvnw.cmd test 24개 전부 통과 확인 후 반영
+
+
+⭐ 관련 커밋
+
+✅ fix: Gemini API 호출 시 API 키를 쿼리스트링 대신 헤더로 전송
