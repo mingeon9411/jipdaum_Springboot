@@ -3,7 +3,9 @@ package com.jipdaum_spring.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jipdaum_spring.dto.chat.ChatMessage;
+import com.jipdaum_spring.dto.product.ProductDetailResponse;
 import com.jipdaum_spring.service.chat.ChatTool;
+import com.jipdaum_spring.service.chat.ProductListResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -18,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -71,8 +74,17 @@ public class GeminiClient {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
-                                      List<ChatTool> tools) {
+    /**
+     * text는 모델의 최종 답변, products는 대화 중 search_products 도구가 실제로 찾아낸 상품
+     * 전체 목록이다 — 화면 오른쪽에 상품 카드를 자동으로 띄우는 용도(ChatService/ChatResponse 참고).
+     * 프론트가 채팅 텍스트만 보고 별도 키워드 매칭으로 추측하지 않고, 챗봇이 실제로 찾은
+     * 상품과 항상 일치하게 하기 위해 여기서 만든 결과를 그대로 흘려보낸다.
+     */
+    public record ChatReply(String text, List<ProductDetailResponse> products) {
+    }
+
+    public Optional<ChatReply> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
+                                         List<ChatTool> tools) {
         return generate(systemPrompt, history, userMessage, tools, Map.of());
     }
 
@@ -81,8 +93,8 @@ public class GeminiClient {
      * 모델이 도구를 호출하면 그 인자에 강제로 덮어써서 넣는다 — 예: 어느 페이지(채널)의 채팅인지에
      * 따라 search_products의 검색 범위(collection)를 모델이 아니라 호출부가 결정하고 싶을 때 쓴다.
      */
-    public Optional<String> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
-                                      List<ChatTool> tools, Map<String, Object> toolContext) {
+    public Optional<ChatReply> generate(String systemPrompt, List<ChatMessage> history, String userMessage,
+                                         List<ChatTool> tools, Map<String, Object> toolContext) {
         if (!StringUtils.hasText(apiKey)) {
             log.warn("gemini.api-key가 설정되지 않아 LLM 호출을 건너뜁니다.");
             return Optional.empty();
@@ -99,6 +111,8 @@ public class GeminiClient {
         List<Map<String, Object>> toolDeclarations = tools.isEmpty()
                 ? null
                 : List.of(Map.of("functionDeclarations", tools.stream().map(this::toFunctionDeclaration).toList()));
+
+        List<ProductDetailResponse> foundProducts = new ArrayList<>();
 
         try {
             for (int round = 0; round < MAX_TOOL_CALL_ROUNDS; round++) {
@@ -123,12 +137,12 @@ public class GeminiClient {
                             .filter(p -> p.get("text") != null)
                             .map(p -> p.get("text").toString())
                             .collect(Collectors.joining());
-                    return StringUtils.hasText(text) ? Optional.of(text) : Optional.empty();
+                    return StringUtils.hasText(text) ? Optional.of(new ChatReply(text, foundProducts)) : Optional.empty();
                 }
 
                 // 모델의 functionCall 턴(thoughtSignature 포함)을 그대로 히스토리에 echo해야 다음 호출이 유효하다.
                 contents.add(toContent("model", parts));
-                contents.add(toContent("user", executeToolCalls(functionCalls, toolsByName, toolContext)));
+                contents.add(toContent("user", executeToolCalls(functionCalls, toolsByName, toolContext, foundProducts)));
             }
         } catch (Exception e) {
             log.warn("Gemini API 호출 실패", e);
@@ -188,7 +202,8 @@ public class GeminiClient {
     }
 
     private List<Map<String, Object>> executeToolCalls(List<Map<?, ?>> functionCalls, Map<String, ChatTool> toolsByName,
-                                                         Map<String, Object> toolContext) {
+                                                         Map<String, Object> toolContext,
+                                                         List<ProductDetailResponse> foundProducts) {
         List<Map<String, Object>> responseParts = new ArrayList<>();
         for (Map<?, ?> callPart : functionCalls) {
             Map<?, ?> functionCall = (Map<?, ?>) callPart.get("functionCall");
@@ -213,9 +228,23 @@ public class GeminiClient {
                     result = Map.of("error", "조회 중 오류가 발생했습니다.");
                 }
             }
+
+            // 화면 표시용 상품 목록은 Gemini에게 보내는 요약본과 분리돼 있다 — forModel만 실제
+            // functionResponse로 보내고, products는 최종 답변에 실어 돌려주기 위해 따로 모아둔다.
+            Object forModel = result;
+            if (result instanceof ProductListResult productListResult) {
+                forModel = productListResult.forModel();
+                // 한 대화에서 search_products를 여러 번 부르면(프롬프트로 자제시키지만 모델이
+                // 어길 수 있다) 같은 상품이 패널에 중복으로 뜨지 않도록 id 기준으로 걸러 담는다.
+                Set<Long> alreadyFound = foundProducts.stream().map(ProductDetailResponse::id).collect(Collectors.toSet());
+                productListResult.products().stream()
+                        .filter(p -> alreadyFound.add(p.id()))
+                        .forEach(foundProducts::add);
+            }
+
             responseParts.add(Map.of("functionResponse", Map.of(
                     "name", name,
-                    "response", Map.of("result", result)
+                    "response", Map.of("result", forModel)
             )));
         }
         return responseParts;

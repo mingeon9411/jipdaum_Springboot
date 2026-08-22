@@ -17,7 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +76,16 @@ public class ProductService {
             products = productRepository.findAll();
         }
         return products.stream().map(ProductDetailResponse::from).toList();
+    }
+
+    /**
+     * id 목록 순서(유사도 랭킹 등)를 그대로 보존해서 상세 정보를 채워 돌려준다 — 챗봇의
+     * 의미 검색(임베딩)이 id만 갖고 있을 때 화면에 보여줄 전체 상품 카드가 필요해서 추가.
+     */
+    public List<ProductDetailResponse> getProductsByIds(List<Long> ids) {
+        var byId = productRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Product::getId, ProductDetailResponse::from));
+        return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     public ProductDetailResponse getProduct(Long id) {

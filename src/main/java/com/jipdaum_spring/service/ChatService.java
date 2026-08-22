@@ -1,6 +1,7 @@
 package com.jipdaum_spring.service;
 
 import com.jipdaum_spring.dto.chat.ChatMessage;
+import com.jipdaum_spring.dto.chat.ChatResponse;
 import com.jipdaum_spring.service.chat.ChatTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -167,7 +168,7 @@ public class ChatService {
      * history는 프론트가 들고 있는 이전 대화 턴 (서버 DB에 저장하지 않는 stateless 멀티턴).
      * Gemini 호출이 실패하거나 api-key가 설정되지 않은 환경에서는 기존 규칙 기반 답변으로 폴백한다.
      */
-    public String reply(String message, List<ChatMessage> history) {
+    public ChatResponse reply(String message, List<ChatMessage> history) {
         return reply(message, history, null);
     }
 
@@ -176,7 +177,7 @@ public class ChatService {
      * search_products가 그 문맥에 맞는 상품 진열(collection)만 검색하도록 고정 인자로 주입한다 —
      * 모델이 스스로 진열을 고르게 두지 않는다(카테고리명이 두 진열에서 겹쳐서 혼동 소지가 있다).
      */
-    public String reply(String message, List<ChatMessage> history, String channel) {
+    public ChatResponse reply(String message, List<ChatMessage> history, String channel) {
         List<ChatMessage> trimmedHistory = history == null
                 ? List.of()
                 : history.stream()
@@ -186,13 +187,13 @@ public class ChatService {
         String collection = CHANNEL_KOREAN_HALL.equals(channel) ? "korean_hall" : "main";
         Map<String, Object> toolContext = Map.of("collection", collection);
 
-        Optional<String> llmReply = geminiClient.generate(SYSTEM_PROMPT, trimmedHistory, message, chatTools, toolContext);
+        Optional<GeminiClient.ChatReply> llmReply = geminiClient.generate(SYSTEM_PROMPT, trimmedHistory, message, chatTools, toolContext);
         if (llmReply.isPresent()) {
-            return llmReply.get();
+            return new ChatResponse(llmReply.get().text(), llmReply.get().products());
         }
 
         log.info("Gemini 응답을 받지 못해 규칙 기반 답변으로 폴백합니다.");
-        return ruleBasedReply(message);
+        return new ChatResponse(ruleBasedReply(message));
     }
 
     private String ruleBasedReply(String message) {

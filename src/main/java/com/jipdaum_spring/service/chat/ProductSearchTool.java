@@ -62,23 +62,24 @@ public class ProductSearchTool implements ChatTool {
         if (StringUtils.hasText(search) && !embeddingIndex.isEmpty()) {
             List<ProductEmbeddingIndex.ProductSummary> semanticResults = semanticSearch(search, categoryId, collection);
             if (!semanticResults.isEmpty()) {
-                return semanticResults.stream()
-                        .map(s -> Map.of(
-                                "id", s.id(),
-                                "name", s.name(),
-                                "brand", s.brand() != null ? s.brand() : "",
-                                "basePrice", s.basePrice(),
-                                "categoryName", s.categoryName() != null ? s.categoryName() : ""
-                        ))
-                        .toList();
+                List<Long> ids = semanticResults.stream().map(ProductEmbeddingIndex.ProductSummary::id).toList();
+                List<ProductDetailResponse> products = productService.getProductsByIds(ids);
+                return new ProductListResult(toModelView(products), products);
             }
             // 임베딩 검색이 결과를 못 찾으면(질의 임베딩 실패 포함) 아래 키워드 검색으로 폴백한다.
         }
 
-        List<ProductDetailResponse> products = productService.getProducts(search, categoryId, collection);
-        return products.stream()
+        List<ProductDetailResponse> products = productService.getProducts(search, categoryId, collection).stream()
                 .limit(MAX_RESULTS)
-                .map(p -> Map.of(
+                .toList();
+        return new ProductListResult(toModelView(products), products);
+    }
+
+    // Gemini에게 보낼 요약본 — 토큰/비용 방어를 위해 이름/브랜드/가격/카테고리만 남긴다.
+    // 화면 표시용 전체 정보(ProductListResult.products)는 execute()가 별도로 함께 반환한다.
+    private List<Map<String, Object>> toModelView(List<ProductDetailResponse> products) {
+        return products.stream()
+                .<Map<String, Object>>map(p -> Map.of(
                         "id", p.id(),
                         "name", p.name(),
                         "brand", p.brand() != null ? p.brand() : "",
