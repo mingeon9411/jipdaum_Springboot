@@ -1,0 +1,106 @@
+
+⭐ jipdaum_Springboot 날짜별 작업일지 (작업 시작일 2026-06-26 ~ 2026-08-23)
+
+📅 2026-06-26
+✅ 프로젝트 초기 커밋 (Spring Boot 백엔드 저장소 생성)
+
+📅 2026-07-01
+✅ 결제 시스템 Spring Boot 통합 및 주문/쿠폰/상품 API 구현
+
+📅 2026-07-03
+✅ 결제/인증 보안 취약점 수정 및 서비스 계층 정리
+
+📅 2026-07-13
+✅ pom.xml 파싱 오류 수정 및 미사용 import 정리
+
+📅 2026-07-14
+✅ Claude Code 설정 디렉토리 gitignore 추가
+✅ Django-Spring 기능 감사 결과 반영, 챗봇/카테고리 API 포팅
+
+📅 2026-07-20
+✅ Django Users 앱의 로컬 계정 인증(회원가입/로그인/로그아웃/닉네임확인/이메일OTP)을
+   Spring으로 포팅
+✅ 로컬 인증 API를 실제 프론트엔드 계약(/api/users/*, 필드별 에러)에 맞춤
+
+📅 2026-07-21
+✅ MySQL(jibdaum)로 DB 드라이버 전환, Oracle 전용 SYSDATE 제거
+✅ 다른 PC 인수인계용 CLAUDE.md / application.yml.example 추가
+✅ Hibernate 물리 네이밍 전략을 표준 전략으로 고정(Django 대문자 테이블명 매칭)
+
+📅 2026-07-22
+✅ 소셜 로그인 안정화 및 회원 탈퇴 기능 구현
+
+📅 2026-07-23
+✅ Spring 소유 테이블 자동 생성 + 주문 추적(tracking) 필드 추가
+
+📅 2026-07-24
+✅ mvnw 실행 권한 복구 및 파일 끝 개행 정리
+✅ 주문 생성 시 carrier/tracking_number NULL 제약 위반 수정
+
+📅 2026-07-27
+✅ Spring Boot 2차 작업 결과 보고 PPT 추가
+
+📅 2026-07-28
+✅ 이메일 인증 발송을 로고 포함 HTML 메일로 변경
+
+📅 2026-07-29
+✅ 인증 메일 로고를 J.D/한옥 2개로 분리
+
+📅 2026-07-30
+✅ OWASP 점검 후 인증/권한 취약점 보완
+
+📅 2026-07-31
+✅ 네이버 소셜 로그인 계정 불일치 및 재로그인 시 세션 재사용 문제 수정
+✅ 탈퇴한 소셜 로그인 계정이 재로그인 시 자동으로 복구되도록 수정
+
+📅 2026-08-03
+✅ Dockerfile 및 Docker Hub 이미지 빌드/푸시 CI 워크플로 추가
+
+📅 2026-08-04
+✅ 카테고리/쿠폰/상품옵션 관리자 CRUD API 추가
+✅ 로그 파일 gitignore 추가 및 사소한 포맷 정리
+
+📅 2026-08-05
+✅ 컨트롤러 계층 위반 정리 (Controller > Service > Repository)
+
+📅 2026-08-07
+✅ 상품 리뷰 이미지 업로드 지원 추가
+✅ 미인증 /api/** 요청에 리다이렉트 대신 JSON 401 반환하도록 수정
+
+📅 2026-08-16
+✅ Gemini 기반 LLM 챗봇 도입 (stateless 멀티턴 + 상품 조회 tool-calling)
+
+📅 2026-08-18
+✅ main push 시 EC2 자동 배포 CI 스텝 추가
+
+📅 2026-08-19 (챗봇 기능 집중 개발일)
+✅ feature/gemini-chatbot 브랜치 병합
+✅ 챗봇 엔드포인트에 Bucket4j rate limit 적용 (계정/IP당 분당 제한)
+✅ 챗봇 system prompt를 인테리어 컨설턴트 페르소나로 개편
+✅ 챗봇 대화 시작 시 hCaptcha 검증 추가, 소셜 로그인(카카오/네이버/구글)에도 hCaptcha 게이트 적용
+✅ hCaptcha/Gemini 호출을 WebClient+block()에서 동기 RestClient로 전환
+✅ 네이버 소셜 로그인 client-authentication-method 누락 수정
+✅ 챗봇 상품 검색에 RAG(임베딩 의미 검색) 도입
+✅ 룩북 갤러리용 포토리뷰 조회 API 추가
+
+📅 2026-08-20 (챗봇 안정화일)
+✅ 챗봇 hCaptcha 게이트 제거(UX 문제로 판단, rate limit로 대체 방어)
+✅ Gemini API 호출/임베딩 호출에 Accept: application/json 헤더 명시
+✅ Gemini 응답을 Content-Type 무관하게 문자열로 받아 직접 JSON 파싱하도록 수정
+✅ 챗봇 상품 검색에 진열(collection) 스코프 추가 — 한국관 지원
+✅ 도구 호출 라운드 축소로 챗봇 응답 지연 개선
+✅ 작업 기록 문서화, README를 Spring Boot 담당 기능 중심으로 재작성
+
+📅 2026-08-21
+✅ 소셜 로그인에 신규/기존 회원 여부 신호 추가
+
+📅 2026-08-22
+✅ Gemini API 호출 시 API 키를 쿼리스트링 대신 헤더로 전송 (자체 보안 리뷰로 발견한
+   타임아웃 시 로그 노출 문제 수정)
+✅ 챗봇 검색 결과 상품을 응답에 실어 화면 오른쪽 패널에 자동 표시하는 기능 추가
+
+📅 2026-08-23 (PASS/hCaptcha 이슈 대응일)
+✅ 세션 작업 요약 문서 추가(pull 동기화 ~ 챗봇 상품 패널)
+✅ 프론트 PASS 데모 전환에 맞춰 백엔드 hCaptcha 실검증 제거 → 곧바로 revert하여
+   실제 hCaptcha 검증 복원(사용자 요청)
+✅ PASS 되돌리기 및 Cloudflare Pages 빌드 이슈 요약 문서, 전체 개발 요약 문서 추가
