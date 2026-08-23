@@ -11,6 +11,7 @@ import com.jipdaum_spring.exception.AuthException;
 import com.jipdaum_spring.exception.FieldValidationException;
 import com.jipdaum_spring.security.CurrentUserProvider;
 import com.jipdaum_spring.security.JipdaumUserProvisioner;
+import com.jipdaum_spring.security.captcha.HCaptchaService;
 import com.jipdaum_spring.security.jwt.JwtTokenProvider;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -51,16 +52,19 @@ public class UserAuthService {
     private final JipdaumUserProvisioner jipdaumUserProvisioner;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final HCaptchaService hCaptchaService;
     private final CurrentUserProvider currentUserProvider;
     private final JavaMailSender mailSender;
 
     @Value("${app.mail.from}")
     private String mailFrom;
 
-    // PASS(통신사 본인인증) 데모는 실제 검증을 하지 않는다(HCaptchaService 참고) — request.recaptchaToken()은
-    // 프론트가 여전히 보내지만(PassVerifyModal의 mock 토큰) 여기서는 더 이상 검증하지 않는다.
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
+        if (!hCaptchaService.verify(request.recaptchaToken())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
+        }
+
         String nickname = request.nickname().trim();
         String email = request.email().trim();
 
@@ -90,6 +94,10 @@ public class UserAuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        if (!hCaptchaService.verify(request.recaptchaToken())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 인증에 실패했습니다. 다시 시도해주세요.");
+        }
+
         String identifier = request.username().trim();
         JipdaumUser user = jipdaumUserRepository.findByUsername(identifier)
                 .orElseGet(() -> identifier.contains("@")
