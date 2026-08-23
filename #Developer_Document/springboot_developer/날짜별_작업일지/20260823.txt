@@ -1,0 +1,6 @@
+⭐ 2026-08-23 (PASS/hCaptcha 이슈 대응일)
+
+✅ 세션 작업 요약 문서 추가(pull 동기화 ~ 챗봇 상품 패널)
+✅ 프론트 PASS 데모 전환에 맞춰 백엔드 hCaptcha 실검증 제거 → 곧바로 revert하여
+   실제 hCaptcha 검증 복원(사용자 요청)
+✅ PASS 되돌리기 및 Cloudflare Pages 빌드 이슈 요약 문서, 전체 개발 요약 문서 추가

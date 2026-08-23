@@ -1,0 +1,4 @@
+⭐ 2026-07-14
+
+✅ Claude Code 설정 디렉토리 gitignore 추가
+✅ Django-Spring 기능 감사 결과 반영, 챗봇/카테고리 API 포팅

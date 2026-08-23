@@ -1,0 +1,10 @@
+⭐ 2026-08-19 (챗봇 기능 집중 개발일)
+
+✅ feature/gemini-chatbot 브랜치 병합
+✅ 챗봇 엔드포인트에 Bucket4j rate limit 적용 (계정/IP당 분당 제한)
+✅ 챗봇 system prompt를 인테리어 컨설턴트 페르소나로 개편
+✅ 챗봇 대화 시작 시 hCaptcha 검증 추가, 소셜 로그인(카카오/네이버/구글)에도 hCaptcha 게이트 적용
+✅ hCaptcha/Gemini 호출을 WebClient+block()에서 동기 RestClient로 전환
+✅ 네이버 소셜 로그인 client-authentication-method 누락 수정
+✅ 챗봇 상품 검색에 RAG(임베딩 의미 검색) 도입
+✅ 룩북 갤러리용 포토리뷰 조회 API 추가

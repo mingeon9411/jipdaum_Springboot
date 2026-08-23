@@ -1,0 +1,5 @@
+⭐ 2026-07-21
+
+✅ MySQL(jibdaum)로 DB 드라이버 전환, Oracle 전용 SYSDATE 제거
+✅ 다른 PC 인수인계용 CLAUDE.md / application.yml.example 추가
+✅ Hibernate 물리 네이밍 전략을 표준 전략으로 고정(Django 대문자 테이블명 매칭)

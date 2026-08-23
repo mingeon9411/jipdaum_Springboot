@@ -1,0 +1,8 @@
+⭐ 2026-08-20 (챗봇 안정화일)
+
+✅ 챗봇 hCaptcha 게이트 제거(UX 문제로 판단, rate limit로 대체 방어)
+✅ Gemini API 호출/임베딩 호출에 Accept: application/json 헤더 명시
+✅ Gemini 응답을 Content-Type 무관하게 문자열로 받아 직접 JSON 파싱하도록 수정
+✅ 챗봇 상품 검색에 진열(collection) 스코프 추가 — 한국관 지원
+✅ 도구 호출 라운드 축소로 챗봇 응답 지연 개선
+✅ 작업 기록 문서화, README를 Spring Boot 담당 기능 중심으로 재작성

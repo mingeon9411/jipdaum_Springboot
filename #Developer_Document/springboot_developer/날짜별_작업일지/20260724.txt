@@ -1,0 +1,4 @@
+⭐ 2026-07-24
+
+✅ mvnw 실행 권한 복구 및 파일 끝 개행 정리
+✅ 주문 생성 시 carrier/tracking_number NULL 제약 위반 수정
