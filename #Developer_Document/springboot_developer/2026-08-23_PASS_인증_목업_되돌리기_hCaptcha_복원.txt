@@ -1,0 +1,54 @@
+
+⭐ PASS 인증 목업 → hCaptcha 복원 (2026-08-23)
+
+✅ 배경: 프론트가 hCaptcha를 PASS(통신사 본인인증) 데모로 교체했었음
+
+➡️ Team-DaumAna가 hCaptcha 위젯 대신 화면 흐름만 재현하는 PassVerifyModal로
+   교체(실제 검증 없음, mock-pass-... 토큰만 생성)
+➡️ 백엔드(HCaptchaService.verify())는 여전히 실제 hCaptcha siteverify API로
+   검증하고 있어서 mock 토큰이 전부 거부됨 → 회원가입/로그인/소셜로그인이
+   프로덕션에서 전부 400 "보안 인증에 실패했습니다"로 막힘
+➡️ 사용자 요청으로 1차 조치: HCaptchaService.verify() 및 호출 3곳(회원가입/
+   로그인/소셜캡차) 제거해서 PASS 데모와 맞춤(커밋 07e42a1)
+
+
+✅ 이후 "H캡차 다시 살려두자" 요청으로 백엔드+프론트 전체 원복
+
+➡️ 07e42a1을 git revert(커밋 09c58a8)로 되돌려 HCaptchaService.verify(),
+   HCaptchaResponseDto, 3개 호출 지점을 전부 복원
+➡️ application.yml.example의 hcaptcha.verify-url도 함께 복원
+➡️ Team-DaumAna 쪽은 사용자가 직접 PassVerifyModal 삭제 + hCaptcha 위젯
+   복귀 커밋(94eaad4)을 이미 반영해둔 상태였음(Cloudflare Pages 마이그레이션,
+   공지사항 상세보기 등 무관한 변경은 그대로 유지)
+➡️ 프로덕션 재확인: mock 토큰으로 /api/auth/social-captcha 호출 시 다시
+   400(hCaptcha 실검증 정상 작동) 확인
+
+
+✅ 이어서 발견된 별개 이슈: Cloudflare Pages에 새 프론트 배포가 안 됨
+
+➡️ jipdaum.life에서 로그인 시도 시 "hCaptcha has failed to initialize" +
+   콘솔에 "Missing sitekey" — VITE_HCAPTCHA_SITE_KEY가 Cloudflare Pages
+   프로젝트 환경변수에 미등록 상태였음(PASS 전환 때 .env.example에서 지워짐)
+➡️ 사용자가 환경변수를 등록했지만 여전히 동일 에러 — Vite 환경변수는 빌드
+   시점에 번들에 굳어지므로, 값만 등록하고 재빌드를 안 하면 반영 안 됨
+➡️ 재배포를 유도했으나, Cloudflare Pages가 main의 최신 커밋을 계속
+   못 물어가고 예전 커밋(4ddaeab)에 멈춰있음을 확인
+➡️ 원인 추정: Cloudflare Pages 기본 빌드 Node 버전(보통 18.x)이 vite 7의
+   요구사항(engines: node ^20.19.0 || >=22.12.0)을 못 맞춰서, Cloudflare
+   Pages로 이관된(1b14acc) 이후의 모든 빌드가 계속 실패하고 있었을 가능성
+➡️ 조치(Team-DaumAna, jipdaum_Springboot와 별개 저장소): frontend/.nvmrc(20)
+   추가 + package.json에 engines.node(">=20.19.0") 명시해서 Cloudflare
+   Pages가 올바른 Node 버전으로 빌드하도록 유도 — 재배포 성공 여부는
+   사용자 확인 대기 중
+
+
+⭐ 관련 커밋
+
+jipdaum_Springboot
+✅ 07e42a1  fix: PASS 데모 전환에 맞춰 백엔드 hCaptcha 실검증 제거
+✅ 09c58a8  Revert "fix: PASS 데모 전환에 맞춰 백엔드 hCaptcha 실검증 제거"
+
+Team-DaumAna
+✅ 1b14acc  feat: 공지사항 게시글 상세보기, hCaptcha를 PASS 인증 목업으로 교체, Cloudflare Pages 마이그레이션
+✅ 94eaad4  revert: PASS 인증 목업을 다시 hCaptcha로 되돌림
+✅ 79f1975  fix: Cloudflare Pages 빌드용 Node 버전 고정 (vite 7이 Node 18 미지원)
