@@ -1,4 +1,8 @@
 ⭐ 2026-07-24
 
 ✅ mvnw 실행 권한 복구 및 파일 끝 개행 정리
+
 ✅ 주문 생성 시 carrier/tracking_number NULL 제약 위반 수정
+➡️ JIPDAUM_ORDER.carrier/tracking_number는 DB에서 NOT NULL(기본값 '')인데 Order
+   엔티티가 초기화하지 않아 null로 INSERT되면서 주문 생성이 500으로 실패하던 문제 —
+   Django Order 모델(CharField(default=''))과 맞춰 빈 문자열로 기본값 설정

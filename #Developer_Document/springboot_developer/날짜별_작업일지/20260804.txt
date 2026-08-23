@@ -1,4 +1,13 @@
 ⭐ 2026-08-04
 
 ✅ 카테고리/쿠폰/상품옵션 관리자 CRUD API 추가
+➡️ Django에서 관리자 페이지로만 가능했던 기능들을 Spring REST API로 이관 —
+   AdminProductController와 동일한 패턴(create/update/delete/getAll), /api/admin/**는
+   기존 SecurityConfig로 ROLE_ADMIN만 접근 가능
+➡️ AdminCategoryController/Service(자기참조 상위카테고리 방지), AdminCouponController/
+   Service(생성 시 usedCount/createdAt 자동 설정), AdminProductOptionController/Service
+   (상품 소속 검증) 추가
+➡️ Coupon/Category/ProductOption 엔티티에 누락돼 있던 @GeneratedValue 추가(DB는
+   원래 AUTO_INCREMENT였음)
+
 ✅ 로그 파일 gitignore 추가 및 사소한 포맷 정리

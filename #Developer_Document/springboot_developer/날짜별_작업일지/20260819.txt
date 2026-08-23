@@ -1,10 +1,50 @@
 ⭐ 2026-08-19 (챗봇 기능 집중 개발일)
 
 ✅ feature/gemini-chatbot 브랜치 병합
-✅ 챗봇 엔드포인트에 Bucket4j rate limit 적용 (계정/IP당 분당 제한)
+
+✅ 챗봇 엔드포인트에 Bucket4j rate limit 적용
+➡️ POST /api/shop/chat이 비로그인도 열려있는 permitAll 경로라 과금되는 Gemini 호출을
+   익명으로 무제한 반복 호출할 수 있었음 — ChatRateLimitFilter를 추가해 로그인
+   사용자는 계정(email) 단위, 비로그인은 IP 단위로 토큰 버킷 분리
+➡️ 버킷은 Caffeine 캐시(maximumSize=50,000, expireAfterAccess=30분)에 보관해 키가
+   계속 늘며 메모리를 고갈시키는 것을 방지. 기본값(버스트 10, 분당 10 리필)은
+   app.chat.rate-limit.*로 오버라이드 가능
+
 ✅ 챗봇 system prompt를 인테리어 컨설턴트 페르소나로 개편
-✅ 챗봇 대화 시작 시 hCaptcha 검증 추가, 소셜 로그인(카카오/네이버/구글)에도 hCaptcha 게이트 적용
-✅ hCaptcha/Gemini 호출을 WebClient+block()에서 동기 RestClient로 전환
+➡️ 톤(친절한 존댓말/1:1 상담), DB 도구 기반 정확성 원칙, 공간 중심 추천, 정책 준수
+   범위, 2회 실패·민감 CS 시 상담원 이관, 개인정보 최소 수집 원칙 반영
+➡️ 원 기획안 중 시스템이 뒷받침 못하는 두 항목(치수/소재 기반 추천, "OpenAI 미활용"
+   문구)은 할루시네이션을 유발할 수 있어 그대로 넣지 않고 조정
+
+✅ 챗봇 대화 시작 시 hCaptcha 검증 추가
+➡️ 봇이 새 대화를 계속 만들어 Gemini 호출 비용을 태우는 것을 막기 위해 history가
+   빈 "새 대화 시작" 요청에서만 hCaptcha 검증, 후속 메시지는 rate limit로만 방어
+
+✅ hCaptcha/Gemini 호출을 WebClient+block()에서 RestClient로 전환
+➡️ 서블릿 기반 blocking MVC인데 WebClient reactive pipeline을 바로 block()으로
+   되돌리는 안티패턴이었음 — 동기 클라이언트 RestClient로 교체, reactor Retry.backoff는
+   수동 재시도 루프(1회, 500ms)로 대체
+➡️ 코드베이스 전체에서 WebClient/Mono/Flux 사용처가 이 두 곳뿐이라
+   spring-boot-starter-webflux 의존성 자체를 pom에서 제거
+
 ✅ 네이버 소셜 로그인 client-authentication-method 누락 수정
+➡️ 네이버 토큰 엔드포인트는 client 인증을 POST 바디로만 받는데(Basic 헤더 기본값
+   거부) naver 등록 정보에만 이 설정이 빠져있어 "네이버만 로그인 오류"가 나던 문제
+
+✅ 소셜 로그인(카카오/네이버/구글)에도 hCaptcha 게이트 적용
+➡️ /oauth2/authorization/{id}는 브라우저가 직접 이동하는 GET이라 JSON으로 캡차
+   토큰을 못 보냄 — POST /api/auth/social-captcha로 먼저 토큰을 검증받아 60초짜리
+   1회용 ticket을 발급받고, SocialLoginCaptchaFilter가 그 ticket을 검사하는 2단계
+   플로우 도입
+
 ✅ 챗봇 상품 검색에 RAG(임베딩 의미 검색) 도입
+➡️ Gemini embedContent/batchEmbedContents로 상품을 벡터화해 메모리에만 보관하는
+   브루트포스 코사인 유사도 인덱스 추가(Django 스키마를 안 건드리려 영속화하지 않음)
+➡️ ProductSearchTool: search 파라미터가 있으면 임베딩 검색 우선 시도, 결과 없거나
+   인덱스가 비어있으면 기존 LIKE 키워드 검색으로 폴백
+➡️ 부수적으로 GeminiClient read timeout을 12초→25초로 상향(라이브 테스트로 타임아웃
+   확인), gemini.model을 3.7-flash→3.6-flash로 교체(3.7이 tool-calling에서 반복 503)
+
 ✅ 룩북 갤러리용 포토리뷰 조회 API 추가
+➡️ GET /api/shop/products/reviews/photos — 상품 상관없이 사진 첨부된 리뷰만
+   최신순 100건까지 반환

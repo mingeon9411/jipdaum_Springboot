@@ -1,8 +1,31 @@
 ⭐ 2026-08-20 (챗봇 안정화일)
 
-✅ 챗봇 hCaptcha 게이트 제거(UX 문제로 판단, rate limit로 대체 방어)
-✅ Gemini API 호출/임베딩 호출에 Accept: application/json 헤더 명시
-✅ Gemini 응답을 Content-Type 무관하게 문자열로 받아 직접 JSON 파싱하도록 수정
+✅ 챗봇 hCaptcha 게이트 제거
+➡️ invisible hCaptcha가 자동 통과 안 될 때 챌린지 팝업이 뜨면서 UX가 나빠지는
+   문제로 제거 — 봇 남용 방어는 ChatRateLimitFilter가 계속 담당
+
+✅ Gemini API/임베딩 호출에 Accept: application/json 헤더 명시
+➡️ Content-Type(요청)만 지정하고 Accept(응답)는 안 정해서, 유료 티어 전환 후 실제
+   200 응답을 받아보니 Content-Type이 application/octet-stream으로 와 RestClient의
+   Map 역직렬화가 실패하던 버그(무료 할당량 소진 429에 가려 여태 안 드러났음) —
+   임베딩 호출(semanticSearch)도 같은 원인으로 매번 조용히 실패해 키워드 검색으로만
+   폴백되던 상태였음
+
+✅ Gemini 응답을 Content-Type 무관하게 문자열로 받아 직접 JSON 파싱
+➡️ Accept 헤더를 명시해도 Gemini가 tools 포함된 큰 요청에서 실제로는 JSON을 주면서
+   Content-Type을 octet-stream으로 잘못 내려주는 케이스가 있어(EC2 raw curl로 확인),
+   .body(String.class)로 받아 ObjectMapper로 직접 파싱하도록 변경
+
 ✅ 챗봇 상품 검색에 진열(collection) 스코프 추가 — 한국관 지원
-✅ 도구 호출 라운드 축소로 챗봇 응답 지연 개선
-✅ 작업 기록 문서화, README를 Spring Boot 담당 기능 중심으로 재작성
+➡️ 메인 진열과 한국관 진열이 카테고리명을 공유해서 카테고리만으론 구분 불가 —
+   Product.collection 기준으로 검색 범위를 좁힘
+➡️ GeminiClient.generate()에 toolContext 파라미터 추가(모델이 아니라 호출부가 고정
+   하는 도구 인자), ChatService.reply(message, history, channel)로 페이지별 분기
+
+✅ 챗봇 응답 지연 개선 — 불필요한 도구 호출 라운드 축소
+➡️ "소파 추천해줘" 한 번에 상품별 상세조회를 반복 호출하며 4라운드를 꽉 채워
+   30~60초씩 걸리던 문제 — 프롬프트 지침 추가 + MAX_TOOL_CALL_ROUNDS 4→3 축소
+
+✅ 챗봇 작업 기록 문서화, README를 Spring Boot 담당 기능 중심으로 재작성
+➡️ Team-DaumAna 문서 양식을 참고해 오늘 챗봇 관련 6개 커밋 정리, README에
+   Tech Stack/담당 기능 테이블/로컬 실행 순서 재정리

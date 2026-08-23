@@ -1,3 +1,9 @@
 ⭐ 2026-07-30
 
 ✅ OWASP 점검 후 인증/권한 취약점 보완
+➡️ /api/shop/** 세분화: 상품 조회·챗봇은 공개 유지, 장바구니/주문/쿠폰/리뷰 작성
+   등은 SecurityConfig에서 인증을 강제(서비스 계층 체크에만 의존하지 않는 defense-in-depth)
+➡️ 회원가입에도 로그인과 동일하게 hCaptcha 검증 추가(자동 대량 가입 방지)
+➡️ /api/users/me가 CurrentUserProvider를 거치도록 리팩터링해 탈퇴 사용자 체크를
+   우회하던 문제 수정, RegisterRequest/EmailOtpSendRequest에 이메일 형식 검증 추가
+➡️ PortOne 결제 검증 실패 시 내부 예외 메시지를 클라이언트에 노출하지 않도록 수정

@@ -1,3 +1,7 @@
 ⭐ 2026-07-23
 
-✅ Spring 소유 테이블 자동 생성 + 주문 추적(tracking) 필드 추가
+✅ Spring 소유 테이블 자동 생성 + 주문 추적 기능 추가
+➡️ users / BLACKLISTED_TOKEN 테이블을 부팅 시 자동 생성해, 공유 Django MySQL
+   (ddl-auto=none)에서 소셜 로그인·로그아웃이 500 나던 문제 해결
+➡️ 주문 추적 기능 추가: carrier/tracking number 필드, TrackingProvider(mock 구현),
+   OrderTrackingResponse

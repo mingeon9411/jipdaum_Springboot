@@ -1,5 +1,16 @@
 ⭐ 2026-07-21
 
 ✅ MySQL(jibdaum)로 DB 드라이버 전환, Oracle 전용 SYSDATE 제거
-✅ 다른 PC 인수인계용 CLAUDE.md / application.yml.example 추가
-✅ Hibernate 물리 네이밍 전략을 표준 전략으로 고정(Django 대문자 테이블명 매칭)
+➡️ Django와 공유하는 jibdaum MySQL DB에 맞춰 ojdbc11 대신 mysql-connector-j로 전환
+➡️ JipdaumUserProvisioner의 네이티브 INSERT에 남아있던 Oracle 전용 SYSDATE를
+   표준 SQL CURRENT_TIMESTAMP로 교체
+
+✅ 다른 PC 인수인계용 CLAUDE.md와 application.yml.example 추가
+➡️ application.yml이 시크릿 때문에 gitignore 대상이라 새로 클론하면 파일 자체가
+   없어 앱을 못 띄우는 문제 — MySQL이 Django와 공유되는 구조, 컨테이너는 Team-DaumAna가
+   관리한다는 점 등을 문서화해 다음 세션이 바로 이어서 작업 가능하게 함
+
+✅ Hibernate 물리 네이밍 전략을 표준 전략으로 고정
+➡️ Spring Boot 기본 네이밍 전략이 @Table(name="JIPDAUM_CATEGORY") 같은 명시적
+   테이블명까지 소문자 스네이크케이스로 강제 변환해서 Django가 만든 대문자 테이블과
+   이름이 안 맞아 "Table doesn't exist" 에러가 나던 문제 수정

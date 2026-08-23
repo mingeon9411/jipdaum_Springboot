@@ -1,3 +1,5 @@
 ⭐ 2026-07-13
 
 ✅ pom.xml 파싱 오류 수정 및 미사용 import 정리
+➡️ pom.xml scm 태그에 실수로 들어간 백틱 문자로 Maven 빌드 자체가 실패하던 문제 수정
+➡️ SecurityConfig.java의 미사용 AbstractHttpConfigurer import 제거

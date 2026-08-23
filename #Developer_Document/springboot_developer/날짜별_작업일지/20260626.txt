@@ -1,3 +1,5 @@
 ⭐ 2026-06-26
 
-✅ 프로젝트 초기 커밋 (Spring Boot 백엔드 저장소 생성)
+✅ 프로젝트 초기 커밋
+➡️ Spring Boot 백엔드 저장소 생성(jipdaum_Springboot) — 집다움 프로젝트의 API 서버로
+   Django와 별도 저장소로 분리해서 시작

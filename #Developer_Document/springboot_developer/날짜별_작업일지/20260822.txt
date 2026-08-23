@@ -1,5 +1,15 @@
 ⭐ 2026-08-22
 
-✅ Gemini API 호출 시 API 키를 쿼리스트링 대신 헤더로 전송 (자체 보안 리뷰로 발견한
-   타임아웃 시 로그 노출 문제 수정)
-✅ 챗봇 검색 결과 상품을 응답에 실어 화면 오른쪽 패널에 자동 표시하는 기능 추가
+✅ Gemini API 호출 시 API 키를 쿼리스트링 대신 헤더로 전송
+➡️ generateContent/embedContent/batchEmbedContents 3개 엔드포인트 전부 ?key=...
+   쿼리스트링을 x-goog-api-key 헤더로 교체
+➡️ 타임아웃 시 RestClient가 던지는 ResourceAccessException 메시지에 요청 URI
+   (=API 키 포함)가 그대로 실려 로그에 키가 평문 노출되던 문제 수정(자체 보안 리뷰로 발견)
+
+✅ 챗봇 검색 결과 상품을 응답에 실어 화면에 자동 표시
+➡️ search_products 도구 실행 결과를 Gemini용 요약본(forModel)과 화면 표시용 전체
+   상품(products)으로 분리(ProductListResult) — 임베딩 검색 경로도 랭킹 순서를
+   보존해 전체 상품 정보를 채움
+➡️ GeminiClient.generate()가 최종 답변과 함께 실제로 찾은 상품 목록을 반환하도록
+   변경(중복 호출 시 id로 dedup), ChatResponse/ChatService/ChatController가 이
+   products를 그대로 API 응답에 포함 — 메인/한국관 챗봇 공용으로 적용

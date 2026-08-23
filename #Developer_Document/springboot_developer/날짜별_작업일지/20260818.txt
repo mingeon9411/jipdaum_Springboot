@@ -1,3 +1,6 @@
 ⭐ 2026-08-18
 
 ✅ main push 시 EC2 자동 배포 CI 스텝 추가
+➡️ docker build & push 후 SSH로 EC2 접속해 이미지 pull + 컨테이너 재생성
+   (appleboy/ssh-action, EC2_HOST/EC2_USERNAME/EC2_SSH_KEY 시크릿 사용)
+➡️ 배포 후 docker image prune -f로 이전 이미지 정리(디스크 여유 확보)

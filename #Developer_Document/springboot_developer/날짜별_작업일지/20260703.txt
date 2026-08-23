@@ -1,3 +1,19 @@
 ⭐ 2026-07-03
 
 ✅ 결제/인증 보안 취약점 수정 및 서비스 계층 정리
+➡️ [보안] 결제 검증을 우회할 수 있던 processPayment 엔드포인트 제거, PortOne 검증
+   경로로 일원화 — 결제 확인 시 본인 결제인지 소유권 검증도 추가
+➡️ [보안] /api/users/** 전체가 인증 없이 열려 있던 것을 관리자 전용으로 제한,
+   인증 없이 장바구니/유저 정보를 노출하던 디버그 엔드포인트 제거
+➡️ [보안] OAuth 로그인 성공 시 access/refresh 토큰이 URL 쿼리스트링에 그대로
+   노출되던 것을 1회용 코드 교환 방식(SocialLoginCodeStore + /api/auth/social-exchange)으로 변경
+➡️ [보안] JWT access/refresh 토큰의 type 클레임 실제 검증(상호 대체 사용 방지),
+   PortOne 결제 조회 URL의 paymentId 형식 검증 추가
+➡️ [보안] 쿠폰 사용 횟수·상품 옵션 재고를 DB 레벨 조건부 UPDATE로 원자 처리해
+   동시성 어뷰징 방지, application.yml 중복 spring: 키로 인한 부팅 실패 수정
+➡️ [구조] 대소문자만 다른 domain.User/domain.user 패키지가 Windows 파일시스템에서
+   실제로 물리 충돌 나던 것을 domain.springuser/domain.jipdaumuser로 분리해 해소
+➡️ [구조] Cart/Order/Coupon/Product/Auth 컨트롤러의 Map<String,Object> 요청/응답을
+   record DTO(@Valid)로 전환, 죽은 코드 제거
+➡️ [테스트] Coupon/JwtTokenProvider/OrderService/CouponService 단위 테스트 추가,
+   OWASP Dependency-Check 플러그인 추가

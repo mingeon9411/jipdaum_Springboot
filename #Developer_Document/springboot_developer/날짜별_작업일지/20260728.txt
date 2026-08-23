@@ -1,3 +1,5 @@
 ⭐ 2026-07-28
 
 ✅ 이메일 인증 발송을 로고 포함 HTML 메일로 변경
+➡️ 기존 SimpleMailMessage(순수 텍스트) 대신 MimeMessageHelper로 발송해 집다움
+   로고를 인라인 이미지(cid)로 포함하고 안내 문구를 다듬음

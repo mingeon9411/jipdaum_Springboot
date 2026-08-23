@@ -1,3 +1,8 @@
 ⭐ 2026-07-01
 
 ✅ 결제 시스템 Spring Boot 통합 및 주문/쿠폰/상품 API 구현
+➡️ Payment 엔티티에 merchantUid/transactionId/createdAt 필드 추가, PortOne V2 REST API
+   연동으로 OrderService에 readyPayment()/verifyPayment() 구현
+➡️ OrderController에 /payment-ready, /payment-verify 엔드포인트 추가
+➡️ 장바구니/주문/상품/쿠폰/인증 API 전체를 이 커밋에서 한 번에 구현(초기 뼈대)
+➡️ application.yml을 .gitignore에 추가(DB 비번 등 민감정보가 커밋되지 않도록)

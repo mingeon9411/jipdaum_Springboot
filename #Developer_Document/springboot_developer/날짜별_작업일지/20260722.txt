@@ -1,3 +1,10 @@
 ⭐ 2026-07-22
 
 ✅ 소셜 로그인 안정화 및 회원 탈퇴 기능 구현
+➡️ OAuth2 실패 핸들러 추가(콜백 실패 시 원인 로깅 + 프론트로 에러 전달)
+➡️ 카카오/네이버 응답에 필수 필드 누락 시 명확한 에러 처리, 네이버 이메일 미제공
+   시 placeholder 이메일로 로그인 유지
+➡️ 존재하지 않는 springuser.users 테이블 접근 실패가 로그인/인증을 막지 않도록 방어
+➡️ POST /api/users/withdraw 신규: JIPDAUM_USER 비활성화 + refresh token 블랙리스트,
+   JWT 필터가 탈퇴 여부를 매 요청마다 확인하도록 함
+➡️ ProductController의 중복/오타 메서드 제거

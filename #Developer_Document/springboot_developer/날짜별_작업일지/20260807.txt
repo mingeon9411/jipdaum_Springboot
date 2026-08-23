@@ -1,4 +1,12 @@
 ⭐ 2026-08-07
 
 ✅ 상품 리뷰 이미지 업로드 지원 추가
+➡️ FileUploadController/WebConfig로 업로드 파일 서빙, Review/CreateReviewRequest/
+   ReviewResponse에 이미지 URL 필드 확장
+➡️ 비로그인도 /uploads/** GET 접근 허용(정적 파일 서빙), multipart 업로드 제한 설정
+
 ✅ 미인증 /api/** 요청에 리다이렉트 대신 JSON 401 반환하도록 수정
+➡️ oauth2Login()의 기본 진입점이 미인증 요청을 /login으로 302 리다이렉트하는데,
+   axios/fetch가 그대로 따라가 로그인 HTML을 200 OK로 받아버려 배열 아닌 응답에
+   .filter() 호출하는 식으로 프론트가 크래시하던 문제 — RestAuthenticationEntryPoint를
+   추가해 /api/**에만 항상 깔끔한 401 JSON을 주도록 함

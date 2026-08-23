@@ -1,3 +1,7 @@
 ⭐ 2026-08-05
 
 ✅ 컨트롤러 계층 위반 정리 (Controller > Service > Repository)
+➡️ UserController/AuthController가 Repository를 직접 호출하던 부분을 UserService/
+   AuthService로 옮겨 계층 흐름 통일(응답 바디/상태 코드는 기존과 동일하게 유지)
+➡️ UserService: getAllUsers/deleteUser/getMe 로직 이관(UserResponse/MeResponse DTO 추가)
+➡️ AuthService: social-exchange/refresh 로직 이관, 미사용 중복 필드 제거

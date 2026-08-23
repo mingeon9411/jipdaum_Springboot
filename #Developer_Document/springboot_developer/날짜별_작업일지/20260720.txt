@@ -1,5 +1,14 @@
 ⭐ 2026-07-20
 
-✅ Django Users 앱의 로컬 계정 인증(회원가입/로그인/로그아웃/닉네임확인/이메일OTP)을
-   Spring으로 포팅
+✅ Django Users 앱의 로컬 계정 인증(회원가입/로그인/로그아웃/닉네임확인/이메일OTP) 포팅
+➡️ Django에만 남아있던 이메일/비밀번호 인증 기능을 Spring에도 추가(기존엔 OAuth2
+   소셜 로그인만 지원)
+➡️ JipdaumUser에 password/emailVerified 매핑 추가, 로그아웃은 신규 BLACKLISTED_TOKEN
+   테이블로 리프레시 토큰을 실제 무효화
+➡️ hCaptcha는 secret key 미설정 시 통과시키는 Django의 fail-open 동작 유지,
+   이메일 OTP는 기존 JIPDAUM_EMAIL_OTP 테이블 재사용
+
 ✅ 로컬 인증 API를 실제 프론트엔드 계약(/api/users/*, 필드별 에러)에 맞춤
+➡️ 프론트가 register/login/logout을 /api/auth/*가 아닌 /api/users/*로 호출하고,
+   에러 응답도 Django 시절 그대로({error: msg} 또는 필드별 {email|nickname|...: msg})를
+   기대하고 있어서 AuthException/FieldValidationException으로 이 계약에 맞춤

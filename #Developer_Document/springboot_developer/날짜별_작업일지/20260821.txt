@@ -1,3 +1,8 @@
 ⭐ 2026-08-21
 
 ✅ 소셜 로그인에 신규/기존 회원 여부 신호 추가
+➡️ JipdaumUserProvisioner.ensureExists가 실제로 새 행을 만들었는지 boolean으로
+   반환하도록 바꾸고, OAuth2SuccessHandler가 리다이렉트 쿼리에 &existing=true로
+   붙여 보냄(reactivated 플래그와 같은 패턴)
+➡️ 이메일/비밀번호로 이미 가입돼 있던 계정을 소셜로 처음 연결한 경우도 정확히
+   "기존 회원"으로 잡힘 — 프론트가 이 신호로 "이미 가입이 된 회원입니다" 안내

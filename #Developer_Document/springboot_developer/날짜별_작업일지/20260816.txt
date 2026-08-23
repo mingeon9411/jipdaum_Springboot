@@ -1,3 +1,11 @@
 ⭐ 2026-08-16
 
 ✅ Gemini 기반 LLM 챗봇 도입 (stateless 멀티턴 + 상품 조회 tool-calling)
+➡️ GeminiClient: generateContent REST API 호출 + function-calling 루프(최대 4라운드,
+   503/429 재시도, thoughtSignature echo 처리)
+➡️ ChatService: LLM 우선 호출 후 실패/미설정 시 기존 규칙 기반 답변으로 자동 폴백
+➡️ ChatRequest/ChatMessage: 프론트가 대화 이력을 통째로 보내는 stateless 멀티턴 지원
+   (서버 DB에 대화 저장 안 함 — Django가 스키마를 소유하는 제약 회피)
+➡️ service/chat 패키지: ChatTool 인터페이스 + ProductSearchTool/ProductDetailTool
+   (기존 ProductService를 감싼 읽기 전용 도구, 별도 인증 스코핑 불필요)
+➡️ application.yml.example에 gemini.api-key/model/base-url 설정 추가

@@ -1,4 +1,11 @@
 ⭐ 2026-07-14
 
 ✅ Claude Code 설정 디렉토리 gitignore 추가
+
 ✅ Django-Spring 기능 감사 결과 반영, 챗봇/카테고리 API 포팅
+➡️ Django backend의 인수인계 문서(HANDOFF_AUTH_SCOPE.md) 기준으로 Products/Orders/
+   coupons/payments 기능 동등성을 감사하고 발견된 갭을 반영
+➡️ /api/users/me가 Spring 자체 users 테이블이 아니라 Django와 공유하는 JIPDAUM_USER를
+   조회하도록 수정(패스워드 인증 사용자 404, 소셜 로그인 닉네임 드리프트 문제 해결)
+➡️ 쿠폰 검증 시 최소 주문금액 미달 명시 반환, 내 쿠폰 목록에서 만료/비활성 쿠폰 필터링
+➡️ Django의 키워드 기반 챗봇을 /api/shop/chat으로 포팅, /api/shop/products/categories 추가
