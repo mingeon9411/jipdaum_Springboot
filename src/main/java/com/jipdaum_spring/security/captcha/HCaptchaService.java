@@ -58,9 +58,22 @@ public class HCaptchaService {
                     .retrieve()
                     .body(HCaptchaResponseDto.class);
 
-            return response != null && response.success();
+            if (response == null) {
+                log.warn("hCaptcha 검증 응답이 비어있음");
+                return false;
+            }
+            if (!response.success()) {
+                // hCaptcha가 200으로 success:false를 주는 정상 실패 케이스 — 토큰 자체가
+                // 잘못됐는지(재사용/만료), sitekey-secret 불일치인지, 도메인 문제인지를
+                // error-codes로 구분할 수 있다. https://docs.hcaptcha.com/#siteverify-error-codes-table
+                log.warn("hCaptcha 검증 실패: error-codes={}, hostname={}",
+                        response.errorCodes(), response.hostname());
+            }
+            return response.success();
         } catch (RestClientException e) {
-            log.warn("hCaptcha 검증 호출 실패", e);
+            // siteverify 호출 자체가 실패(네트워크/타임아웃/DNS 등)하면 fail-closed로 거부한다.
+            // 원인이 EC2 아웃바운드 연결 문제인지 구분할 수 있도록 verify-url을 같이 남긴다.
+            log.warn("hCaptcha 검증 호출 실패: verify-url={}", verifyUrl, e);
             return false;
         }
     }
