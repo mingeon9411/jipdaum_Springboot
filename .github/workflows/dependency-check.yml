@@ -1,0 +1,53 @@
+name: OWASP Dependency-Check
+
+# 배포 파이프라인(docker-publish.yml)과 분리 — 스캔이 느리거나(레이트리밋) 오탐으로
+# 실패해도 배포는 막지 않는다. 의존성은 커밋마다 바뀌지 않으므로 주 1회 + 수동 실행으로 충분.
+on:
+  schedule:
+    - cron: "0 3 * * 1" # 매주 월요일 03:00 UTC(한국시간 정오)
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # NVD(CVE DB) 캐시 — 캐싱 없이 매번 처음부터 받으면 느리고 레이트리밋에 걸리기 쉽다.
+      # 주 단위로 캐시 키를 바꿔 최신 CVE를 계속 반영한다.
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/dependency-check-data
+          key: dependency-check-data-${{ steps.week.outputs.week }}
+          restore-keys: dependency-check-data-
+
+      - name: Compute cache week key
+        id: week
+        run: echo "week=$(date -u +%Y-%U)" >> "$GITHUB_OUTPUT"
+
+      # NVD_API_KEY 없이는 요청당 지연이 커서 CI에서 사실상 못 쓴다.
+      # https://nvd.nist.gov/developers/request-an-api-key 에서 무료 발급 후
+      # 저장소 Settings > Secrets and variables > Actions에 NVD_API_KEY로 등록 필요.
+      - name: Run OWASP Dependency-Check
+        run: |
+          ./mvnw org.owasp:dependency-check-maven:check \
+            -DnvdApiKey="${{ secrets.NVD_API_KEY }}" \
+            -DdataDirectory="$HOME/.m2/dependency-check-data" \
+            -DfailBuildOnCVSS=7 \
+            -Dformats=HTML,JSON
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.*
+          retention-days: 30

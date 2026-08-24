@@ -1,0 +1,83 @@
+
+⭐ 소셜로그인 CORS 버그 수정, 메인 상품 DB 마이그레이션, OWASP Dependency-Check CI 추가 (2026-08-24)
+
+✅ 소셜 로그인 "보안 인증에 실패했습니다" 400 원인 진단/해결
+
+➡️ 증상: jipdaum.life에서 회원가입/로그인/소셜로그인 시도 시 전부 400 "보안 인증에
+   실패했습니다"
+➡️ EC2(13.209.254.219) SSH 접속해 jipdaum-spring 컨테이너 로그 확인 — hCaptcha 검증
+   실패 로그가 전혀 없음(컨테이너 기동 후 요청 자체가 안 들어오는 상태)
+➡️ 프론트 번들(jipdaum.life의 index-*.js)을 직접 curl로 받아 hCaptcha sitekey/API
+   base URL이 정상적으로 박혀있는지 확인 — 둘 다 정상(지난 세션의 "Missing sitekey"
+   이슈는 이미 해결돼 있었음)
+➡️ nginx access.log에서 실제 원인 확정: "OPTIONS /api/auth/social-captcha" 요청이
+   jipdaum.life Origin에서 오면 403 — CORS preflight 단계에서 막혀 브라우저가 실제
+   POST(캡차 토큰)를 아예 안 보내고 있었음
+➡️ 원인: 프로덕션 application.yml(서버 전용 파일, git 미추적)의 app.frontend-url이
+   Cloudflare Pages 이관 전 값(https://13.209.254.219.nip.io)에 멈춰있어서, CORS가
+   실제 프론트 도메인(https://jipdaum.life)을 허용하지 않고 있었음
+➡️ 사용자가 서버에서 직접 /opt/jipdaum/config/application.yml의 frontend-url을
+   https://jipdaum.life로 수정 → jipdaum-spring 컨테이너 재시작
+➡️ curl로 preflight 재확인: Access-Control-Allow-Origin: https://jipdaum.life 로
+   200 정상 응답 확인
+
+
+✅ 챗봇 상품 패널(상세보기/간편구매) 기능 점검 — 이미 구현돼 있었음
+
+➡️ 요청: "챗봇에서 상품 물어보면 오른쪽에 패널 떠서 상세페이지 보고 간편구매까지
+   되게 해달라"
+➡️ Team-DaumAna(D:\Team-DaumAna) ChatBot.jsx 확인 결과 커밋 4ddaeab에 이미 전부
+   구현되어 있음 — 패널 카드 클릭 시 상세페이지 이동(navigate), "바로 구매" 버튼으로
+   BuyPanel(카카오페이 결제) 진입
+➡️ 백엔드도 ChatResponse.products로 ProductDetailResponse(가격/옵션/설명 등) 전체를
+   이미 응답에 포함하고 있어 추가 작업 불필요
+➡️ 안 되는 것처럼 보였던 이유는 위 CORS 버그로 jipdaum.life에서 나가는 모든 API
+   요청(챗봇 메시지 포함)이 막혀 있었기 때문으로 추정
+
+
+✅ 메인 페이지 상품 DB 마이그레이션 — React 카탈로그와 정합 맞춤
+
+➡️ 요청: 챗봇이 예전 시드 상품을 찾아옴 → 메인 페이지 상품 삭제 후 React에 등록된
+   상품으로 DB 마이그레이션(한국관은 제외)
+➡️ 조사 중 더 큰 버그 발견: 메인 페이지 상품 상세(HomeProductDetail.jsx)가 장바구니
+   담기 시 React PRODUCTS 배열의 id(1~14)를 그대로 DB product_id로 전송하는데, DB의
+   "main" 상품(예전 시드, id 1~5·7~15)은 이름·내용이 완전히 다른 상품이라 실제로는
+   엉뚱한 상품이 장바구니/주문에 기록되고 있었음
+➡️ Django(Team-DaumAna) manage.py shell로 프로덕션 DB 직접 조작:
+   - Product.objects.filter(collection='main') 14건 삭제
+     → 연쇄로 ProductOption 14건, Cart 1건, OrderItem 4건(테스트 주문 order 1~4)도
+       함께 삭제됨 — 사용자 확인 후 진행(개발 테스트용 주문이라 무의미하다고 확인받음)
+   - Category "러그", "침대" 신규 추가(React 카탈로그엔 있는데 DB엔 없던 카테고리)
+   - React PRODUCTS 14개 항목을 **동일한 id(1~14)** 로 명시적 삽입 — 이름/가격/설명/
+     카테고리 매핑, collection="main" — id를 맞춘 이유는 장바구니 버그를 근본적으로
+     해결하기 위함(프론트 코드 수정 없이 DB만 맞춰서 해결)
+   - 한국관(collection='korean_hall', id 16~22) 7건은 손대지 않음
+➡️ jipdaum-spring 컨테이너 재시작 → ProductEmbeddingIndexInitializer 21/21 재색인 확인
+➡️ 챗봇에 "메인 페이지 상품 뭐가 있어?" 질의 → 새 상품(북유럽풍 러그 B형, 린넨 우드
+   소파 등)이 정확한 id로 정상 반환되는 것 확인
+
+
+✅ OWASP Dependency-Check CI 자동화 추가
+
+➡️ 기존엔 pom.xml에 플러그인만 등록돼 있고 로컬 수동 실행(mvn org.owasp:dependency-
+   check-maven:check)만 가능한 상태였음
+➡️ .github/workflows/dependency-check.yml 신규 추가
+   - 배포 워크플로(docker-publish.yml)와 완전히 분리 — 스캔 지연/오탐이 배포를
+     막지 않도록
+   - 매주 월요일 03:00 UTC(한국시간 정오) 스케줄 + workflow_dispatch(수동 실행)
+   - NVD(CVE DB) 캐시를 주 단위 키로 actions/cache에 저장해 레이트리밋/속도 문제 완화
+   - CVSS 7점(High) 이상이면 워크플로 실패 처리, 리포트(HTML/JSON)는 아티팩트로
+     30일 보관
+➡️ 남은 작업(사용자 진행 예정): NVD API 키 발급(nvd.nist.gov) 후 저장소 Secrets에
+   NVD_API_KEY로 등록 — 키 없이는 레이트리밋으로 스캔이 느리거나 실패할 수 있음
+
+
+⭐ 관련 변경 사항
+
+jipdaum_Springboot
+✅ .github/workflows/dependency-check.yml 신규 추가 (커밋 예정)
+
+프로덕션 서버/DB (커밋 없음, 서버·DB 직접 반영)
+✅ /opt/jipdaum/config/application.yml — app.frontend-url을 https://jipdaum.life로 수정
+✅ 프로덕션 MySQL — Product(collection='main') 14건 교체, Category 2건 추가,
+   테스트 주문(order 1~4) 및 관련 OrderItem/Cart/ProductOption 삭제
