@@ -1,0 +1,30 @@
+⭐ 2026-08-24 (CORS 버그 수정/메인상품 마이그레이션/OWASP CI 도입일)
+
+✅ 소셜로그인 "보안 인증 실패" 400 원인 진단 → CORS 설정 오류로 확정
+➡️ EC2 SSH 접속해 컨테이너 로그·프론트 번들·nginx access.log를 순서대로 대조 —
+   hCaptcha sitekey는 정상, 실제 원인은 nginx access.log의 OPTIONS 403(CORS preflight
+   거부)
+➡️ 프로덕션 application.yml의 app.frontend-url이 Cloudflare Pages 이관 전 값
+   (nip.io)에 멈춰 있어 jipdaum.life가 CORS 허용 목록에 없었음
+➡️ 서버에서 frontend-url을 https://jipdaum.life로 수정 + 컨테이너 재시작 →
+   preflight 200 확인
+
+✅ 챗봇 상품 패널(상세보기/간편구매) 요청 → 이미 구현돼 있음을 확인, 추가 작업 없음
+➡️ Team-DaumAna ChatBot.jsx에 카드 클릭→상세이동, "바로 구매"→결제 패널이 이미
+   존재(커밋 4ddaeab). 위 CORS 버그로 안 보였을 뿐이었음
+
+✅ 메인 페이지 상품 DB 마이그레이션 (React 카탈로그 기준, 한국관 제외)
+➡️ 조사 중 장바구니 담기가 React PRODUCTS의 id를 그대로 DB product_id로 보내는데
+   DB엔 완전히 다른 예전 시드 상품이 같은 id로 있어 엉뚱한 상품이 주문에 찍히던
+   버그 추가 발견
+➡️ Django manage.py shell로 프로덕션 DB에서 main 상품 14건 삭제(연쇄로 옵션 14건·
+   장바구니 1건·테스트 주문 4건도 삭제, 사용자 확인 받음) → React 카탈로그와 동일한
+   id(1~14)/이름/가격/설명으로 재삽입, 카테고리 "러그"·"침대" 신규 추가
+➡️ 한국관(7건)은 그대로 유지, 컨테이너 재시작 후 임베딩 21/21 재색인·챗봇 응답 확인
+
+✅ OWASP Dependency-Check CI 자동화 추가
+➡️ .github/workflows/dependency-check.yml 신규 — 배포 파이프라인과 분리, 주 1회
+   스케줄+수동실행, NVD 캐시, CVSS 7+ 시 실패 처리
+➡️ NVD_API_KEY 발급/등록은 사용자 진행 예정(보류)
+
+✅ 상세 내용은 2026-08-24_소셜로그인_CORS_수정_메인상품_마이그레이션_OWASP_CI.txt 참고
