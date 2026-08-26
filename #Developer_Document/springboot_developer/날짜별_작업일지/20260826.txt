@@ -43,7 +43,25 @@
 ➡️ CLAUDE.md에 이 문서가 갱신 안 된 스냅샷임을 명시, 기능 분담은 코드 기준으로 판단하도록 기록
 
 
+⭐ GET /api/shop/products에 collection 파라미터 노출 (Team-DaumAna 세션에서 병행 작업)
+
+➡️ 프론트(Team-DaumAna 저장소)에서 메인/한국관 상품 카탈로그 연동 구조를 진단하다가
+   확인 — ProductRepository/ProductService(getProducts 3-인자 오버로드)엔 collection
+   필터링이 이미 구현돼 있는데 컨트롤러가 그 파라미터를 안 받고 있어 프론트가
+   못 쓰고 있었음
+➡️ ProductController.listProducts에 @RequestParam(required=false) String collection
+   추가, 안 넘기면 기존과 동일하게 전체 반환(하위 호환)
+➡️ 주의: 이 변경은 원래 별도 커밋으로 나가려 했으나, 같은 워킹트리에서 동시에
+   진행 중이던 위 SMTP 작업 세션이 커밋할 때 같이 묶여 51ff149("이메일 SMTP
+   환경변수 주입 추가")에 포함된 채로 커밋/푸시/배포됨 — 코드는 정상 반영됐지만
+   커밋 메시지가 실제 변경 내용과 안 맞으니 히스토리 볼 때 참고할 것
+➡️ 프론트 쪽 merge(실제 화면에 이 값 반영)는 보류 — JIPDAUM_PRODUCT의 main
+   컬렉션 데이터가 현재 프론트 상품 라인업과 무관한 옛 시드 데이터라 재입력 전엔
+   위험. korean_hall 컬렉션은 이름/가격이 이미 프론트와 1:1 일치해 프론트 로컬
+   id만 DB 기준(11~17)으로 재구성함(Team-DaumAna 저장소 커밋)
+
+
 ⭐ 관련 커밋
 
-✅ 51ff149  fix: 프로덕션 EC2 배포에 이메일 SMTP 환경변수 주입 추가
+✅ 51ff149  fix: 프로덕션 EC2 배포에 이메일 SMTP 환경변수 주입 추가 (collection 파라미터 변경 포함)
 ✅ 680ad43  docs: 프로덕션 SMTP 발송 실패 진단/수정 작업일지 추가
