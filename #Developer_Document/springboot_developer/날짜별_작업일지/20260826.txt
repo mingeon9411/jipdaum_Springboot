@@ -1,0 +1,47 @@
+
+⭐ 프로덕션 SMTP 이메일 발송 실패 원인 진단/수정 (2026-08-26)
+
+✅ application.yml YAML 파싱 오류 수정
+
+➡️ scope:w (오타)로 인해 OAuth2 google client 설정 YAML 파싱이 깨져 contextLoads 테스트 실패
+➡️ scope: 로 수정, mvnw test 24개 전체 통과 재확인
+
+
+✅ 로컬 SMTP 설정 상태 확인 — 더미가 아니라 실계정으로 이미 구성돼 있었음
+
+➡️ application.yml.example은 smtp.gmail.com + dummy 값이지만, 실제 application.yml은
+   smtp.naver.com + ${EMAIL_HOST_USER:}/${EMAIL_HOST_PASSWORD:}로 env var 참조
+➡️ Windows 사용자 환경변수(User 레벨)에 EMAIL_HOST_USER/EMAIL_HOST_PASSWORD/EMAIL_FROM_ADDRESS가
+   실제 네이버 계정 값으로 이미 등록돼 있어 로컬에서는 실발송 가능한 상태였음
+➡️ CLAUDE.md의 "더미 SMTP라 실발송 안 됨" 기술이 낡은 정보였던 것 확인, 최신화
+
+
+✅ 프로덕션 SMTP 발송 실패 원인 진단
+
+➡️ 실사용자 가입/이메일 OTP 발송 플로우에서 실제로 SMTP 발송 실패 확인
+➡️ .github/workflows/docker-publish.yml의 배포 스텝(EC2 docker run)이 env var 주입 없이
+   /opt/jipdaum/config/application.yml만 마운트하는 구조였음 — 로컬 환경변수는 EC2에 없음
+➡️ 그 결과 ${EMAIL_HOST_USER:} 등이 빈 문자열 기본값으로 풀려 네이버 SMTP 인증이 실패하는
+   구조적 원인으로 결론
+
+
+✅ 배포 워크플로에 이메일 env var 주입 추가
+
+➡️ docker run에 -e EMAIL_HOST_USER/-e EMAIL_HOST_PASSWORD/-e EMAIL_FROM_ADDRESS
+   (GitHub Secrets 참조) 3개 플래그 추가
+➡️ EC2 파일에 평문 비밀번호를 직접 박아두지 않고 Secrets로 배포 시점에 주입하는 방식 선택
+➡️ 적용을 위해 GitHub 저장소 Settings → Secrets and variables → Actions에
+   EMAIL_HOST_USER/EMAIL_HOST_PASSWORD/EMAIL_FROM_ADDRESS 3개를 실값으로 등록 필요
+   (등록 전까지는 여전히 빈 값 주입되어 실패) — 사용자 진행 예정(보류)
+
+
+✅ HANDOFF_AUTH_SCOPE.md가 옛 스냅샷임을 확인
+
+➡️ 2026-07-14 작성 당시엔 "이메일OTP는 Django에 남긴다"고 돼 있었지만, 이후(a946b2c)
+   Spring UserAuthService.sendEmailOtp로 실제 포팅됨 — 이번 SMTP 이슈가 정확히 이 경로에서 발생
+➡️ CLAUDE.md에 이 문서가 갱신 안 된 스냅샷임을 명시, 기능 분담은 코드 기준으로 판단하도록 기록
+
+
+⭐ 관련 커밋
+
+✅ 51ff149  fix: 프로덕션 EC2 배포에 이메일 SMTP 환경변수 주입 추가
