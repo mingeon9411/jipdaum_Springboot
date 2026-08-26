@@ -65,3 +65,22 @@
 
 ✅ 51ff149  fix: 프로덕션 EC2 배포에 이메일 SMTP 환경변수 주입 추가 (collection 파라미터 변경 포함)
 ✅ 680ad43  docs: 프로덕션 SMTP 발송 실패 진단/수정 작업일지 추가
+
+
+⭐ AI 챗봇 아키텍처 정리 (신규 세션, 코드 변경 없음)
+
+✅ origin/main pull — 위 SMTP 작업(8f57591까지) 로컬에 반영, fast-forward
+
+✅ AI 챗봇(POST /api/shop/chat) 핵심 구성 정리 — 향후 참고용으로 기록
+➡️ LLM: GeminiClient가 Gemini(gemini-3.7-flash) generateContent를 동기 RestClient로
+   호출, functionCall 루프를 최대 3라운드 돌며 도구 실행 결과를 재주입. API 키
+   미설정/호출 실패 시 예외 없이 규칙 기반 답변(ChatService.ruleBasedReply)으로 폴백
+➡️ 도구 2종(ChatTool): search_products — ProductEmbeddingIndex(인메모리 브루트포스
+   코사인 유사도)로 의미 기반 검색을 우선 시도하고 결과 없으면 LIKE 키워드 검색 폴백,
+   get_product_detail — 특정 상품 상세 조회. channel(korean-hall/기본)에 따른
+   collection 값은 모델이 아니라 GeminiClient의 toolContext가 고정 주입
+➡️ 시스템 프롬프트: 정확성 원칙(가격/브랜드 등은 도구 조회값만 사용, 치수·소재처럼
+   DB에 없는 정보는 지어내지 않고 정직하게 안내), 배송/반품/쿠폰/등급/적립금 정책
+   범위 내 안내, 반복 미해결·민감 CS는 1:1 문의 이관
+➡️ 남용 방어: ChatRateLimitFilter(Bucket4j, 로그인은 계정 단위/비로그인은 IP 단위,
+   기본 분당 10회), history는 서버 미저장(stateless)이며 최근 20턴까지만 사용
