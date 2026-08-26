@@ -19,12 +19,16 @@ public class ProductController {
         return ResponseEntity.ok(productService.getCategories());
     }
 
+    // collection("main"/"korean_hall")을 넘기면 그 진열 상품만 필터링해서 돌려준다 — 안 넘기면
+    // 기존과 동일하게 전체를 보여준다(하위 호환). 프론트가 아직 이 값을 실제 화면에 merge하진
+    // 않음 — DB 시드 데이터가 현재 상품 라인업과 안 맞아서 재입력 전까지는 조회만 가능하게 열어둠.
     @GetMapping
     public ResponseEntity<?> listProducts(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long category
+            @RequestParam(required = false) Long category,
+            @RequestParam(required = false) String collection
     ) {
-        return ResponseEntity.ok(productService.getProducts(search, category));
+        return ResponseEntity.ok(productService.getProducts(search, category, collection));
     }
 
     @GetMapping("/{id}")

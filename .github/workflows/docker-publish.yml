@@ -50,6 +50,9 @@ jobs:
               --network jipdaum-net \
               -p 127.0.0.1:8081:8081 \
               -v /opt/jipdaum/config/application.yml:/app/config/application.yml:ro \
+              -e EMAIL_HOST_USER='${{ secrets.EMAIL_HOST_USER }}' \
+              -e EMAIL_HOST_PASSWORD='${{ secrets.EMAIL_HOST_PASSWORD }}' \
+              -e EMAIL_FROM_ADDRESS='${{ secrets.EMAIL_FROM_ADDRESS }}' \
               --restart unless-stopped \
               mingeon9411/jipdaum:latest
             docker image prune -f

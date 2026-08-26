@@ -21,6 +21,18 @@
 
 ## 알려진 상태
 
-- `spring.mail`은 더미 SMTP 값이라 실제 이메일 발송은 안 됨(부팅은 정상). 실발송 테스트하려면
-  실제 Gmail 앱 비밀번호로 교체 필요.
+- `spring.mail`은 로컬에서는 실발송 가능한 상태다: `application.yml`이
+  `smtp.naver.com` + `${EMAIL_HOST_USER:}`/`${EMAIL_HOST_PASSWORD:}`를 쓰고, 이 값들은
+  Windows 사용자 환경변수(`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD`/`EMAIL_FROM_ADDRESS`)로
+  실제 네이버 계정 값이 등록돼 있음(`application.yml.example`의 dummy Gmail 값과는 다름).
+  `UserAuthService.sendEmailOtp`가 `JavaMailSender`로 이걸 사용한다.
+- **프로덕션(EC2)은 원래 이 env var들을 못 받는 구조였다** — `.github/workflows/docker-publish.yml`의
+  배포 스텝이 `docker run`에 env var 주입 없이 `/opt/jipdaum/config/application.yml`을 호스트에서
+  그대로 마운트만 했음. 2026-08-26에 실사용자 가입 플로우에서 SMTP 발송 실패가 실제로 확인돼
+  `docker run`에 `-e EMAIL_HOST_USER/-e EMAIL_HOST_PASSWORD/-e EMAIL_FROM_ADDRESS`
+  (GitHub Secrets 참조)를 추가했다. **GitHub 저장소 Settings → Secrets에 같은 이름의 Secret 3개를
+  실제 값으로 등록해야** 다음 배포부터 반영됨(등록 전엔 빈 문자열이 주입되어 여전히 실패).
+- `HANDOFF_AUTH_SCOPE.md`(2026-07-14 작성)는 "이메일OTP는 Django에 남긴다"고 적혀 있지만
+  이후(`a946b2c`) 실제로 Spring `UserAuthService`로 포팅됐다 — 이 문서는 갱신 안 된 옛 스냅샷이니
+  기능 분담 최신 상태는 코드(`UserController`/`UserAuthService`) 기준으로 판단할 것.
 - `./mvnw.cmd test` 기준 24개 테스트 전부 통과 (MySQL 컨테이너가 떠 있어야 `contextLoads` 통과).
