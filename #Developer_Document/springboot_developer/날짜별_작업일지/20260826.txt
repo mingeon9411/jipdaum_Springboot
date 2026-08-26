@@ -30,9 +30,10 @@
 ➡️ docker run에 -e EMAIL_HOST_USER/-e EMAIL_HOST_PASSWORD/-e EMAIL_FROM_ADDRESS
    (GitHub Secrets 참조) 3개 플래그 추가
 ➡️ EC2 파일에 평문 비밀번호를 직접 박아두지 않고 Secrets로 배포 시점에 주입하는 방식 선택
-➡️ 적용을 위해 GitHub 저장소 Settings → Secrets and variables → Actions에
-   EMAIL_HOST_USER/EMAIL_HOST_PASSWORD/EMAIL_FROM_ADDRESS 3개를 실값으로 등록 필요
-   (등록 전까지는 여전히 빈 값 주입되어 실패) — 사용자 진행 예정(보류)
+➡️ GitHub 저장소 Settings → Secrets and variables → Actions에
+   EMAIL_HOST_USER/EMAIL_HOST_PASSWORD/EMAIL_FROM_ADDRESS 3개 실값 등록 완료
+➡️ workflow_dispatch로 docker-publish.yml 수동 재배포 실행 → build-and-push/deploy
+   둘 다 success로 EC2에 반영 확인 완료
 
 
 ✅ HANDOFF_AUTH_SCOPE.md가 옛 스냅샷임을 확인
@@ -45,3 +46,4 @@
 ⭐ 관련 커밋
 
 ✅ 51ff149  fix: 프로덕션 EC2 배포에 이메일 SMTP 환경변수 주입 추가
+✅ 680ad43  docs: 프로덕션 SMTP 발송 실패 진단/수정 작업일지 추가
