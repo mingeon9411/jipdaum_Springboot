@@ -36,3 +36,30 @@
   이후(`a946b2c`) 실제로 Spring `UserAuthService`로 포팅됐다 — 이 문서는 갱신 안 된 옛 스냅샷이니
   기능 분담 최신 상태는 코드(`UserController`/`UserAuthService`) 기준으로 판단할 것.
 - `./mvnw.cmd test` 기준 24개 테스트 전부 통과 (MySQL 컨테이너가 떠 있어야 `contextLoads` 통과).
+
+## 백엔드 변경 시 자체 검수 체크리스트
+
+컨트롤러/DTO/보안 설정을 건드리는 작업을 끝내기 전에 아래를 확인한다. 무거운 전수조사가 아니라
+변경이 닿은 범위에서만 확인하면 됨.
+
+- **예외가 프론트까지 JSON으로 도달하는가**: 새 예외 타입을 던지는 코드를 추가했다면
+  `GlobalExceptionHandler`에 걸리는지 확인. 여기 안 걸리면 Boot 기본 `/error` 포워드가
+  `SecurityConfig`의 `anyRequest().authenticated()`에 걸려 `/login`으로 302 리다이렉트되고,
+  axios는 그 리다이렉트를 그대로 따라가다 크래시난다(각 핸들러 주석 참고).
+  (2026-08-27: `@Valid` 검증 실패(`MethodArgumentNotValidException`)와 그 외 처리 안 된 모든
+  예외(`Exception`)가 이 핸들러에 안 걸리고 있던 걸 발견해 추가함 — 특히 회원가입/로그인/장바구니/
+  주문/결제 등 `@Valid`를 쓰는 19개 엔드포인트가 실제로 이 경로를 탈 수 있었음.)
+- **에러 응답 모양이 프론트 기대와 맞는가**: 필드별 폼 에러는 `{"<field>": message}`
+  (`FieldValidationException` 주석 — `Register.jsx`가 `err.response.data.<field>`로 읽음),
+  그 외 일반 오류는 `ErrorResponse`(`{"error": message}`). 새 핸들러를 추가할 때 이 두 관례 중
+  프론트가 실제로 기대하는 쪽에 맞출 것 — 임의로 새 모양을 만들지 말 것.
+- **`SecurityConfig.authorizeHttpRequests` 순서**: 매처는 먼저 매칭되는 규칙이 이긴다. 새
+  엔드포인트를 추가했으면 의도한 규칙(permitAll/authenticated/hasRole)이 그 앞의 더 넓은
+  패턴에 먼저 걸려 무시되지 않는지 확인.
+- **데드 코드**: 새로 추가한 `@Component`/서비스 메서드가 실제로 호출/주입되는지 확인
+  (Spring 빈은 컴파일러가 안 잡아주므로 grep으로 직접 확인 필요). 안 쓰는 컨트롤러 엔드포인트나
+  주석 처리된 코드는 남기지 말고 지울 것.
+- **보안 스팟체크**: 새 엔드포인트가 클라이언트가 보낸 id(userId 등)를 그대로 신뢰하지 않고
+  `CurrentUserProvider`(SecurityContext)로 소유권을 검증하는지, 새 SQL이 `nativeQuery` 문자열
+  결합이 아닌지, 새 파일 업로드가 확장자 allowlist + 크기 제한 + 랜덤 파일명을 쓰는지
+  (`FileUploadController` 패턴 참고) 확인.
