@@ -43,10 +43,15 @@ public class SecurityConfig {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    // OAuth2 리다이렉트(frontendUrl)는 값 하나로 고정이지만, CORS는 로컬 dev + 배포 등
+    // 여러 origin을 동시에 허용해야 할 수 있어 콤마로 구분된 목록을 따로 받는다.
+    @Value("#{'${app.cors-allowed-origins}'.split(',')}")
+    private List<String> corsAllowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(frontendUrl));
+        config.setAllowedOrigins(corsAllowedOrigins.stream().map(String::trim).toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

@@ -75,6 +75,8 @@ spring:
 
 app:
   frontend-url: http://localhost:5173
+  # CORS가 허용할 origin 목록(콤마 구분, 여러 개 가능). 로그인 리다이렉트는 frontend-url 하나만 씀.
+  cors-allowed-origins: http://localhost:5173
   upload-dir: ./uploads
   mail:
     from: dummy@gmail.com
