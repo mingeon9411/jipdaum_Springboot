@@ -45,7 +45,11 @@ public class SecurityConfig {
 
     // OAuth2 리다이렉트(frontendUrl)는 값 하나로 고정이지만, CORS는 로컬 dev + 배포 등
     // 여러 origin을 동시에 허용해야 할 수 있어 콤마로 구분된 목록을 따로 받는다.
-    @Value("#{'${app.cors-allowed-origins}'.split(',')}")
+    // 기본값을 frontend-url로 잡아둔 건 필수가 아니라 하위 호환 때문 — EC2의
+    // application.yml은 이 저장소 파일과 별개(gitignore)라 이 프로퍼티가 아직 없으면
+    // ${app.cors-allowed-origins}를 못 찾아 컨텍스트 초기화가 실패해 배포가 통째로
+    // 죽는다(2026-08-28 실제 발생: 502로 프로덕션 전체 API가 막힘). 값이 있으면 그걸 쓴다.
+    @Value("#{'${app.cors-allowed-origins:${app.frontend-url}}'.split(',')}")
     private List<String> corsAllowedOrigins;
 
     @Bean
