@@ -1,0 +1,263 @@
+
+⭐ DB 구조 및 Oracle → MySQL 이관 상세 정리 (2026-08-30)
+
+작성 근거: 실제 엔티티 클래스(src/main/java/com/jipdaum_spring/domain/**), application.yml.example,
+pom.xml, 그리고 이관 작업 커밋(4c424a7, 80f6f61, a230de6) 및 인수인계 문서(CLAUDE.md,
+HANDOFF_AUTH_SCOPE.md)를 직접 대조해서 정리했다. 추정이 필요한 부분은 "추정"이라고 명시했다.
+
+
+================================================================================
+⭐ 1장. DB 소유권 구조 — 왜 Spring 혼자 스키마를 못 바꾸는가
+================================================================================
+
+이 프로젝트의 DB는 jibdaum이라는 MySQL 8 인스턴스 하나이고, 이걸 두 백엔드가 나눠 쓴다.
+
+➡️ Django(C:/Pro_Jipdaum/Team-DaumAna) — 회원가입/로그인/로그아웃/닉네임체크/이메일OTP를
+   담당하며, 스키마(테이블 생성/컬럼 변경)는 Django의 마이그레이션이 소유한다.
+➡️ Spring(이 저장소) — 소셜로그인/상품/장바구니/주문/쿠폰 등 나머지 기능을 담당하되,
+   application.yml.example의 spring.jpa.hibernate.ddl-auto: none이 강제돼 있어 Hibernate가
+   테이블을 생성/변경/삭제하는 걸 원천 차단한다. Spring은 Django가 만든 테이블을 JPA
+   엔티티로 "읽고 쓰기"만 한다.
+➡️ 예외: Spring이 스스로 필요로 하지만 Django 스키마엔 없는 보조 테이블 2개(users,
+   BLACKLISTED_TOKEN)는 Spring이 부팅 시점에 CREATE TABLE IF NOT EXISTS로 직접
+   보장한다(2-4 참고) — "Django 테이블은 절대 안 건드리고, Spring 전용 테이블만 만든다"는
+   원칙이라 ddl-auto: none 정책과 충돌하지 않는다.
+
+이 소유권 분리 원칙이 왜 중요한지는 지난 회고 문서(2026-06_2026-08_최대원인_분석_및_
+해결과정)에서 다룬 여러 사고의 배경이기도 하다 — Spring 코드가 스키마에 없는 컬럼을
+기대하면(Product.collection 필드 추가 vs 미적용 마이그레이션, 2026-08-23) 즉시
+contextLoads 테스트나 API가 깨진다. 스키마 변경은 항상 Django 쪽에서 먼저 일어나야 한다.
+
+
+================================================================================
+⭐ 2장. 전체 테이블 구조
+================================================================================
+
+--------------------------------------------------------------------------------
+2-1. Django 소유 테이블 (Spring은 읽기/쓰기만, JPA 엔티티로 매핑)
+--------------------------------------------------------------------------------
+
+| 테이블 | 매핑 엔티티 | 주요 컬럼 | 관계 |
+|---|---|---|---|
+| JIPDAUM_USER | JipdaumUser | id, email, nickname, username, password, is_email_verified, is_active | 전체 FK의 중심축 |
+| JIPDAUM_CATEGORY | Category | id, name, parent_id | parent_id로 self-FK(대/소분류 트리) |
+| JIPDAUM_PRODUCT | Product | id, category_id, name, brand, base_price, description, thumbnail_url, collection, created_at | category_id → JIPDAUM_CATEGORY. collection("main"/"korean_hall")은 Django Products.models.Product.COLLECTION_CHOICES와 매칭되는 진열 구분값 |
+| JIPDAUM_PRODUCT_OPTION | ProductOption | id, product_id, option_name, option_value, extra_price, stock_count | product_id → JIPDAUM_PRODUCT |
+| JIPDAUM_REVIEW | Review | id, product_id, user_id, rating, title, comment, review_image_url, created_at | product_id/user_id FK |
+| JIPDAUM_CART | Cart | id, user_id, product_id, option_id, quantity, created_at | user_id/product_id/option_id FK |
+| JIPDAUM_ORDER | Order | id, user_id, total_amount, discount_amount, coupon_id, status, shipping_addr, order_date, carrier, tracking_number | coupon_id → JIPDAUM_COUPON(nullable), items(1:N)/payment(1:1) |
+| JIPDAUM_ORDER_ITEM | OrderItem | id, order_id, product_id, option_id, quantity, ordered_price | order_id → JIPDAUM_ORDER |
+| JIPDAUM_PAYMENT | Payment | id, order_id(unique, 1:1), user_id, merchant_uid(unique), method, status, amount, transaction_id, paid_at, created_at | order_id 1:1 |
+| JIPDAUM_COUPON | Coupon | id, code(unique), name, discount_type, discount_value, min_order_amount, max_discount_amount, expiry_date, usage_limit, used_count, is_active, is_personal, created_at | 독립 테이블 |
+| JIPDAUM_USER_COUPON | UserCoupon | id, user_id, coupon_id, is_used, used_at, created_at | user_id/coupon_id FK |
+| JIPDAUM_EMAIL_OTP | EmailOtp | id, user_id(FK 아닌 단순 컬럼), email, code, created_at, is_used | 이메일 OTP 인증 코드 저장 |
+
+--------------------------------------------------------------------------------
+2-2. Spring 자체 소유 보조 테이블 (Django 마이그레이션 밖, Spring이 직접 생성/관리)
+--------------------------------------------------------------------------------
+
+| 테이블 | 매핑 엔티티 | 주요 컬럼 | 용도 |
+|---|---|---|---|
+| users (소문자) | springuser.User | id, email, name, profileImage, provider, providerId, role | 소셜 로그인 부가정보(provider/providerId 등) 보관용 Spring 전용 테이블. 실제 인증 주체는 JIPDAUM_USER이고 이건 부가정보만 담는 보조 테이블 |
+| BLACKLISTED_TOKEN | token.BlacklistedToken | id, token(길이 1000), expires_at | 로그아웃 시 무효화된 refresh 토큰 저장(재사용 방지) |
+
+--------------------------------------------------------------------------------
+2-3. ERD (텍스트)
+--------------------------------------------------------------------------------
+
+```
+JIPDAUM_CATEGORY ──(parent_id, self-FK)─┐  대/소분류 트리
+        ▲                               │
+        │ category_id                   │
+JIPDAUM_PRODUCT ◄────────────────────────┘
+   collection: "main" | "korean_hall"
+    │
+    ├──< JIPDAUM_PRODUCT_OPTION (product_id)
+    ├──< JIPDAUM_REVIEW (product_id, user_id → JIPDAUM_USER)
+    ├──< JIPDAUM_CART (user_id, product_id, option_id)
+    └──< JIPDAUM_ORDER_ITEM (order_id, product_id, option_id)
+
+JIPDAUM_USER ──< JIPDAUM_ORDER ──(coupon_id, nullable)── JIPDAUM_COUPON
+                     │  ├──< JIPDAUM_ORDER_ITEM
+                     │  └──1:1── JIPDAUM_PAYMENT (merchant_uid unique)
+                     └── JIPDAUM_USER_COUPON (user_id, coupon_id)
+
+JIPDAUM_USER ──< JIPDAUM_EMAIL_OTP (user_id, 단순 컬럼 — FK 제약 없음)
+
+users / BLACKLISTED_TOKEN  ← Django 테이블과 무관, Spring 단독 소유·관리
+```
+
+--------------------------------------------------------------------------------
+2-4. Spring 전용 테이블의 자가 프로비저닝 (ddl-auto: none 원칙과 공존하는 방법)
+--------------------------------------------------------------------------------
+
+➡️ SpringUserTableInitializer / BlacklistedTokenTableInitializer(둘 다 @Component +
+   @PostConstruct)가 앱 부팅 시 각각 users / BLACKLISTED_TOKEN 테이블을
+   `CREATE TABLE IF NOT EXISTS`로 직접 보장한다(JdbcTemplate 네이티브 SQL).
+➡️ 도입 배경(커밋 a230de6, 2026-07-23): 이 두 테이블은 어느 환경에도 존재한 적이 없어서
+   소셜 로그인 시 users 테이블 관련 저장 실패, 로그아웃 시
+   "Table 'jibdaum.BLACKLISTED_TOKEN' doesn't exist"로 500이 나고 있었다. Django
+   마이그레이션 대상이 아니고 Hibernate도 ddl-auto: none이라 안 만들어주니, Spring이
+   스스로 책임지는 보조 테이블만 예외적으로 직접 만드는 방식을 택함.
+➡️ 생성 실패해도 부팅은 막지 않고 log.warn만 남긴다 — 두 테이블 모두 "있으면 좋고 없어도
+   핵심 기능(로그인/주문)은 죽지 않는" 보조 데이터이기 때문(주석에 명시).
+
+
+================================================================================
+⭐ 3장. Oracle → MySQL 이관 상세 (근거: 커밋 4c424a7, 80f6f61)
+================================================================================
+
+이관은 "DB 엔진을 바꿨다"보다는 정확히는 "Spring 단독 소유 DB(Oracle 추정)에서, Django와
+스키마를 공유하는 MySQL 인스턴스로 옮겨갔다"에 가깝다. 이 전환에서 실제로 부딪힌 차이는
+아래 6가지였다.
+
+--------------------------------------------------------------------------------
+3-1. JDBC 드라이버 교체
+--------------------------------------------------------------------------------
+
+➡️ pom.xml에서 ojdbc11 의존성을 제거하고 com.mysql:mysql-connector-j(runtime scope)로
+   교체(4c424a7). 커넥션 프로토콜 자체가 다른 별개의 드라이버라 애플리케이션 코드 변경 없이
+   의존성/URL(jdbc:mysql://localhost:3306/jibdaum)만 바꾸면 되는 부분.
+
+--------------------------------------------------------------------------------
+3-2. Oracle 전용 SQL 함수 제거
+--------------------------------------------------------------------------------
+
+➡️ JipdaumUserProvisioner의 네이티브 INSERT INTO JIPDAUM_USER 쿼리에 Oracle 전용
+   SYSDATE가 남아있었다. MySQL에는 이 함수가 없어 그대로 실행하면 문법 에러가 난다 →
+   표준 SQL 함수인 CURRENT_TIMESTAMP로 교체(4c424a7). Django가 소유한 스키마 자체의
+   컬럼 타입은 그대로이므로, 이건 "Spring이 직접 짠 네이티브 SQL 문자열" 안에서만 고치면
+   되는 국지적인 수정이었다.
+
+--------------------------------------------------------------------------------
+3-3. 테이블명 대소문자 처리 — Hibernate 네이밍 전략 고정
+--------------------------------------------------------------------------------
+
+➡️ 증상: @Table(name = "JIPDAUM_CATEGORY")처럼 대문자로 명시했는데도
+   "Table 'jibdaum.jipdaum_category' doesn't exist" 에러가 남.
+➡️ 원인: Spring Boot 기본 물리 네이밍 전략(CamelCaseToUnderscoresNamingStrategy 계열)이
+   명시적으로 지정한 테이블명까지 강제로 소문자 스네이크케이스로 변환해버림. Oracle을 쓰던
+   시절엔 문제가 안 됐던 이유는(추정) Oracle이 식별자를 대소문자 구분 없이 대문자로
+   정규화해서 비교하는 경우가 많아 이 변환이 표면화되지 않았을 가능성이 높고, MySQL(특히
+   Linux 컨테이너)은 테이블명을 파일시스템 기반으로 대소문자 구분해서 다루기 때문에
+   Django가 만든 실제 대문자 테이블과 Hibernate가 변환한 소문자 이름이 어긋난 것.
+➡️ 해결(80f6f61, 2026-07-21): application.yml.example의
+   spring.jpa.hibernate.naming.physical-strategy를
+   org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl로 고정 — 이
+   전략은 @Table/@Column에 명시한 이름을 변환 없이 그대로 사용한다.
+
+--------------------------------------------------------------------------------
+3-4. 자동 증가 컬럼 전략
+--------------------------------------------------------------------------------
+
+➡️ Oracle은 전통적으로 시퀀스(+트리거) 또는 12c 이후의 IDENTITY 컬럼으로 자동 증가를
+   구현하는 반면, MySQL은 AUTO_INCREMENT가 네이티브 기능이다. 이 저장소의 엔티티들(Product,
+   Category, ProductOption 등)은 @GeneratedValue(strategy = GenerationType.IDENTITY)를
+   쓰고 있어 MySQL의 AUTO_INCREMENT와 그대로 맞아떨어진다 — 시퀀스 관리 코드가
+   전혀 필요 없어진 부분.
+
+--------------------------------------------------------------------------------
+3-5. CREATE TABLE IF NOT EXISTS — Spring 보조 테이블 자가 생성이 단순해짐
+--------------------------------------------------------------------------------
+
+➡️ 2-4에서 설명한 SpringUserTableInitializer/BlacklistedTokenTableInitializer가 쓰는
+   CREATE TABLE IF NOT EXISTS 구문은 MySQL이 표준으로 지원하는 짧은 구문이다. Oracle은
+   12c 이전엔 이 구문 자체가 없어 PL/SQL로 "테이블 존재 여부 조회 → 없으면 생성"을
+   직접 구현해야 했다 — MySQL 전환 덕에 이 자가 프로비저닝 로직이 한 줄로 끝남.
+
+--------------------------------------------------------------------------------
+3-6. 이관 후에도 남아있는 Oracle 시절 흔적 (기술 부채로 인지만 해둔 부분)
+--------------------------------------------------------------------------------
+
+➡️ Product.description, Review.comment의 @Column(columnDefinition = "CLOB")은 Oracle
+   전용 대용량 텍스트 타입 표기가 그대로 남아있다. 다만 ddl-auto: none이라 이 값은 실제
+   DDL 생성에 전혀 관여하지 않고, MySQL 쪽 실제 컬럼 타입은 Django 마이그레이션이 이미
+   만들어둔 타입(LONGTEXT 등, 추정)을 그대로 읽고 쓴다 — 즉 동작에는 영향이 없는 죽은
+   표기이지만, 다음에 이 엔티티를 손보는 사람이 "왜 CLOB이지?"라고 혼란스러워할 수 있는
+   지점이라 여기 기록해둔다.
+
+
+================================================================================
+⭐ 4장. 이관의 실질적 장점 (이 프로젝트 맥락 기준)
+================================================================================
+
+--------------------------------------------------------------------------------
+4-1. Django와 인스턴스를 공유할 수 있게 됨 — 이관의 직접적 동기
+--------------------------------------------------------------------------------
+
+➡️ Django ORM은 PostgreSQL/MySQL/SQLite를 1급으로 지원하고 Oracle은 별도 서드파티
+   백엔드(django-cx-Oracle 등)가 필요하다. 두 프레임워크가 DB 인스턴스 하나(jibdaum)를
+   공유해야 하는 이 프로젝트 구조상, MySQL이 아니었다면 "인스턴스 공유"라는 선택지
+   자체가 훨씬 번거로웠을 것 — CLAUDE.md에 이 공유 구조가 프로젝트의 기본 전제로
+   명시돼 있다.
+
+--------------------------------------------------------------------------------
+4-2. 로컬 개발 진입장벽 감소 — Docker 컨테이너 1개로 대체
+--------------------------------------------------------------------------------
+
+➡️ CLAUDE.md: "컨테이너는 Spring 쪽이 아니라 Team-DaumAna/docker-compose.yml이 관리한다
+   (jibdaum-mysql). 로컬에서 Spring을 띄우기 전에 그 저장소에서 docker compose up -d로
+   먼저 켜야 함." — Oracle의 무거운 설치형 배포(리스너/tnsnames.ora 등 초기 설정)에
+   비해, 신규 PC에서 개발 환경을 갖추는 데 필요한 절차가 컨테이너 기동 한 줄로 줄었다.
+   인수인계 문서(534b5af, "다른 PC 인수인계용 CLAUDE.md와 application.yml.example
+   추가")가 이 시점에 정리된 것도 같은 맥락.
+
+--------------------------------------------------------------------------------
+4-3. 라이선스 비용 없음
+--------------------------------------------------------------------------------
+
+➡️ Oracle Database는 Standard/Enterprise Edition 기준 상용 라이선스(코어/프로세서
+   단위 과금)가 필요하다. MySQL Community Edition은 GPL 기반 무료 오픈소스 —
+   개인/소규모 프로젝트에서 별도 예산 없이 프로덕션까지 그대로 운영 가능(실제로 이
+   프로젝트는 EC2에 Docker 컨테이너로 MySQL 없이 직접 구성해 자체 컨테이너로만
+   운영 중).
+
+--------------------------------------------------------------------------------
+4-4. Spring Boot / Hibernate 생태계와의 마찰 감소
+--------------------------------------------------------------------------------
+
+➡️ mysql-connector-j는 Spring Boot의 spring-boot-starter-data-jpa와 사실상 표준
+   조합으로 문서/커뮤니티 자료가 훨씬 풍부하다. 실제로 이번 이관 중 만난 문제(네이밍
+   전략, SYSDATE)는 둘 다 잘 알려진 유형이라 원인 특정이 빨랐다 — Oracle 전용 이슈였다면
+   레퍼런스가 더 적었을 것.
+
+--------------------------------------------------------------------------------
+4-5. SQL 이식성 향상 (부수 효과)
+--------------------------------------------------------------------------------
+
+➡️ 이관 과정에서 SYSDATE 같은 Oracle 전용 함수를 표준 SQL(CURRENT_TIMESTAMP)로 바꾸는
+   계기가 됐다. 지금 코드베이스에 남은 네이티브 SQL은 이제 표준 SQL에 더 가까워졌다는
+   부수적 이점이 있다.
+
+
+================================================================================
+⭐ 5장. 이관과 함께 따라온 제약/트레이드오프 (같이 기록)
+================================================================================
+
+➡️ 테이블명 대소문자 구분: 3-3에서 설명한 네이밍 전략 고정이 필요했다는 것 자체가
+   MySQL(파일시스템 기반 식별자 처리)로 넘어오며 새로 신경 써야 했던 디테일이다 —
+   설정 한 줄로 고정하면 끝나는 일회성 비용이라 지속적인 부담은 아니다.
+➡️ 스키마 소유권 이원화의 대가: DB 엔진 자체와는 별개로, "Django가 스키마를 소유하고
+   Spring은 ddl-auto: none으로 묶여 있다"는 구조 때문에 Spring 엔티티에 필드를 추가해도
+   Django 마이그레이션이 먼저 적용되지 않으면 즉시 깨진다(2026-08-23 contextLoads 실패
+   사례, 2026-06_2026-08_최대원인_분석_및_해결과정 문서 참고). 이건 MySQL의 단점이
+   아니라 "DB를 공유한다"는 아키텍처 선택 자체의 트레이드오프다.
+➡️ Spring 전용 보조 테이블(users, BLACKLISTED_TOKEN)이 부팅 시 자가 생성되는 구조는
+   실용적이지만, 이 두 테이블의 스키마 변경(컬럼 추가 등)이 필요해지면 마이그레이션
+   도구 없이 초기화 코드를 직접 고쳐야 한다는 한계가 있다 — 지금 규모(컬럼 6~7개, 거의
+   불변)에서는 문제 없지만 향후 이 테이블이 커지면 Flyway/Liquibase 같은 정식
+   마이그레이션 도구 도입을 고려할 지점.
+
+
+================================================================================
+⭐ 6장. 결론
+================================================================================
+
+이번 이관의 본질은 "Oracle 문법을 MySQL 문법으로 바꾼 것"이 아니라 "Spring이 단독으로
+소유하던 DB를, Django 마이그레이션이 스키마를 소유하고 Spring은 읽기/쓰기만 하는 공유
+DB 체제로 전환한 것"이다. 그 과정에서 만난 기술적 차이(SYSDATE, 네이밍 전략, 드라이버)는
+전부 하루~이틀 안에 해결된 국지적 이슈였고, 실제로 이후 두 달간 반복적으로 문제가 된 것은
+DB 엔진 차이가 아니라 "스키마를 공유하는데 두 저장소의 변경 순서가 안 맞을 때"였다(위
+2026-06_2026-08_최대원인_분석_및_해결과정 문서의 환경설정 드리프트 계열과는 별개의,
+스키마 드리프트 계열 문제). 이 부분은 Django 쪽 마이그레이션 적용 여부를 Spring 배포 전
+체크리스트에 넣는 식의 프로세스 보완이 유효할 것으로 보인다(아직 미반영, 제안 단계).
