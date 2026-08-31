@@ -37,14 +37,10 @@ public class ProductService {
                 .toList();
     }
 
-    public List<ProductDetailResponse> getProducts(String search, Long categoryId) {
-        return getProducts(search, categoryId, null);
-    }
-
     /**
      * collection이 주어지면("main"/"korean_hall") 그 진열에 속한 상품만 대상으로 한다 — 챗봇이
-     * 페이지 문맥(메인 쇼핑몰 vs 한국관)에 맞는 상품만 추천하도록 ProductSearchTool이 사용한다.
-     * 공개 상품 목록 API(2-arg 오버로드)는 기존과 동일하게 collection 구분 없이 전체를 보여준다.
+     * 페이지 문맥(메인 쇼핑몰 vs 한국관)에 맞는 상품만 추천하도록 ProductSearchTool이 사용하고,
+     * 공개 상품 목록 API(ProductController)는 null을 넘겨 기존과 동일하게 전체를 보여준다.
      */
     public List<ProductDetailResponse> getProducts(String search, Long categoryId, String collection) {
         List<Product> products;
