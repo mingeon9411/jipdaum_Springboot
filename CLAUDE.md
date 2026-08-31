@@ -47,7 +47,9 @@
 - `HANDOFF_AUTH_SCOPE.md`(2026-07-14 작성)는 "이메일OTP는 Django에 남긴다"고 적혀 있지만
   이후(`a946b2c`) 실제로 Spring `UserAuthService`로 포팅됐다 — 이 문서는 갱신 안 된 옛 스냅샷이니
   기능 분담 최신 상태는 코드(`UserController`/`UserAuthService`) 기준으로 판단할 것.
-- `./mvnw.cmd test` 기준 24개 테스트 전부 통과 (MySQL 컨테이너가 떠 있어야 `contextLoads` 통과).
+- `./mvnw.cmd test` 기준 33개 테스트 전부 통과 (MySQL 컨테이너가 떠 있어야 `contextLoads` 통과).
+  2026-08-31에 302 리다이렉트 재발/챗봇 지연 두 케이스 스터디가 지적한 회귀 테스트 부재를
+  메우며 9개 추가(`GlobalExceptionHandlerTest`, `RestAuthenticationEntryPointTest`, `GeminiClientTest`).
 
 ## 백엔드 변경 시 자체 검수 체크리스트
 
