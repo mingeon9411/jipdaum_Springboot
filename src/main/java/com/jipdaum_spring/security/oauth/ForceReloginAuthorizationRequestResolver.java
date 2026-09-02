@@ -12,14 +12,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 브라우저에 구글/네이버 로그인 세션이 남아있으면 인가 요청을 다시 보내도 로그인/보안인증
+ * 브라우저에 구글/네이버/카카오 로그인 세션이 남아있으면 인가 요청을 다시 보내도 로그인/보안인증
  * 화면 없이 바로 통과된다. provider별로 "기존 세션 무시하고 다시 로그인" 파라미터를 붙여서, 소셜
  * 재로그인 시 매번 로그인(2단계 인증 포함) 화면을 다시 띄우도록 강제한다.
  * - 구글: prompt=login (OIDC 표준 prompt 파라미터)
  * - 네이버: auth_type=reprompt (네이버 전용 파라미터)
- * - 카카오: 강제 파라미터를 붙이지 않는다. prompt=login을 붙이면 카카오톡 QR 로그인 위젯이
- *   감춰지고 ID/PW 폼만 뜨는 문제(실사용자 리포트, 2026-09-02)가 있어 제외했다 — 카카오는
- *   기존 세션이 남아있으면 재로그인 화면 없이 바로 통과되는 것을 감수한다.
+ * - 카카오: prompt=qr_login. 카카오 공식 REST API 문서(login/none/create/select_account)에는
+ *   없는 값이지만, 카카오 담당자가 개발자 포럼(devtalk.kakao.com/t/sdk-qr/146595)에서
+ *   "웹 환경에서 REST 방식으로 로그인 요청 시 prompt=qr_login을 요청하면 QR인증을 사용할 수
+ *   있다"고 답변한 근거로 추가함(2026-09-02, 카카오톡 QR 로그인이 안 된다는 실사용자
+ *   리포트 대응). 이전에는 prompt=login을 썼으나 QR 위젯을 가릴 수 있어 제외했었는데,
+ *   qr_login 자체가 QR 노출용 값이라는 게 확인되어 이걸로 교체. 비공식/미문서화 값이라
+ *   카카오 쪽 사양 변경 시 조용히 무시될 수 있음 — 배포 후 실제 QR 노출 여부 재확인 필요.
  */
 @Component
 public class ForceReloginAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
@@ -57,6 +61,9 @@ public class ForceReloginAuthorizationRequestResolver implements OAuth2Authoriza
         } else if (uri.contains("accounts.google.com")) {
             paramName = "prompt";
             paramValue = "login";
+        } else if (uri.contains("kauth.kakao.com")) {
+            paramName = "prompt";
+            paramValue = "qr_login";
         } else {
             return authorizationRequest;
         }
