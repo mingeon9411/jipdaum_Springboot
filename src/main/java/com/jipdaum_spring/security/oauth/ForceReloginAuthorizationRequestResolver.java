@@ -12,11 +12,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 브라우저에 카카오/구글/네이버 로그인 세션이 남아있으면 인가 요청을 다시 보내도 로그인/보안인증
+ * 브라우저에 구글/네이버 로그인 세션이 남아있으면 인가 요청을 다시 보내도 로그인/보안인증
  * 화면 없이 바로 통과된다. provider별로 "기존 세션 무시하고 다시 로그인" 파라미터를 붙여서, 소셜
- * 재로그인 시 매번 로그인(2단계 인증/QR 포함) 화면을 다시 띄우도록 강제한다.
- * - 카카오/구글: prompt=login (OIDC 표준 prompt 파라미터, 카카오도 동일하게 지원)
+ * 재로그인 시 매번 로그인(2단계 인증 포함) 화면을 다시 띄우도록 강제한다.
+ * - 구글: prompt=login (OIDC 표준 prompt 파라미터)
  * - 네이버: auth_type=reprompt (네이버 전용 파라미터)
+ * - 카카오: 강제 파라미터를 붙이지 않는다. prompt=login을 붙이면 카카오톡 QR 로그인 위젯이
+ *   감춰지고 ID/PW 폼만 뜨는 문제(실사용자 리포트, 2026-09-02)가 있어 제외했다 — 카카오는
+ *   기존 세션이 남아있으면 재로그인 화면 없이 바로 통과되는 것을 감수한다.
  */
 @Component
 public class ForceReloginAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
@@ -51,7 +54,7 @@ public class ForceReloginAuthorizationRequestResolver implements OAuth2Authoriza
         if (uri.contains("nid.naver.com")) {
             paramName = "auth_type";
             paramValue = "reprompt";
-        } else if (uri.contains("kauth.kakao.com") || uri.contains("accounts.google.com")) {
+        } else if (uri.contains("accounts.google.com")) {
             paramName = "prompt";
             paramValue = "login";
         } else {
