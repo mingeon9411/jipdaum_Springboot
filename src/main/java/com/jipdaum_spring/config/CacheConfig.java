@@ -3,7 +3,11 @@ package com.jipdaum_spring.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -12,9 +16,37 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import java.time.Duration;
 
+@Slf4j
 @Configuration
 @EnableCaching
-public class CacheConfig {
+public class CacheConfig implements CachingConfigurer {
+
+    /**
+     * Redis가 죽어있거나(프로덕션 EC2에 아직 컨테이너가 없는 경우 포함) 접속 실패 시 예외를 앱까지
+     * 전파시키지 않고 로그만 남긴 뒤 캐시 미스처럼 취급한다 — 캐싱은 성능 최적화일 뿐이므로 그것
+     * 때문에 상품 목록 조회 자체가 500이 나면 안 된다.
+     */
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException e, Cache cache, Object key) {
+                log.warn("캐시 조회 실패({}) - DB에서 직접 조회합니다: {}", cache.getName(), e.getMessage());
+            }
+            @Override
+            public void handleCachePutError(RuntimeException e, Cache cache, Object key, Object value) {
+                log.warn("캐시 저장 실패({}): {}", cache.getName(), e.getMessage());
+            }
+            @Override
+            public void handleCacheEvictError(RuntimeException e, Cache cache, Object key) {
+                log.warn("캐시 무효화 실패({}): {}", cache.getName(), e.getMessage());
+            }
+            @Override
+            public void handleCacheClearError(RuntimeException e, Cache cache) {
+                log.warn("캐시 전체 삭제 실패({}): {}", cache.getName(), e.getMessage());
+            }
+        };
+    }
 
     /**
      * 캐시 대상(ProductDetailResponse 등)이 record라 JDK 기본 직렬화(Serializable) 대상이 아니므로
