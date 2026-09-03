@@ -7,6 +7,7 @@ import com.jipdaum_spring.domain.product.ProductRepository;
 import com.jipdaum_spring.dto.product.ProductOptionCreateRequest;
 import com.jipdaum_spring.dto.product.ProductOptionResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class AdminProductOptionService {
     private final ProductRepository productRepository;
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductOptionResponse create(Long productId, ProductOptionCreateRequest request) {
         Product product = findProduct(productId);
         ProductOption option = ProductOption.builder()
@@ -37,6 +39,7 @@ public class AdminProductOptionService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductOptionResponse update(Long productId, Long optionId, ProductOptionCreateRequest request) {
         ProductOption option = findOption(productId, optionId);
         option.update(
@@ -49,6 +52,7 @@ public class AdminProductOptionService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public void delete(Long productId, Long optionId) {
         productOptionRepository.delete(findOption(productId, optionId));
     }

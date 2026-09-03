@@ -9,6 +9,7 @@ import com.jipdaum_spring.dto.product.ProductDetailResponse;
 import com.jipdaum_spring.dto.product.ReviewResponse;
 import com.jipdaum_spring.security.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +42,11 @@ public class ProductService {
      * collection이 주어지면("main"/"korean_hall") 그 진열에 속한 상품만 대상으로 한다 — 챗봇이
      * 페이지 문맥(메인 쇼핑몰 vs 한국관)에 맞는 상품만 추천하도록 ProductSearchTool이 사용하고,
      * 공개 상품 목록 API(ProductController)는 null을 넘겨 기존과 동일하게 전체를 보여준다.
+     *
+     * 30초 TTL로 Redis에 캐싱한다(CacheConfig 참고) — Django Admin의 상품 수정은 이 캐시를
+     * 무효화하지 못하므로 반영까지 최대 30초 지연이 있을 수 있다(최종 일관성으로 타협).
      */
+    @Cacheable(value = "products", key = "#search + ':' + #categoryId + ':' + #collection")
     public List<ProductDetailResponse> getProducts(String search, Long categoryId, String collection) {
         List<Product> products;
         if (search != null && !search.isBlank()) {

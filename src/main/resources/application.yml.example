@@ -9,6 +9,14 @@ spring:
     username: root
     password: rootpassword
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      # 상품 목록 캐시(ProductService, CacheConfig 참고)용. 로컬 실행 전 Team-DaumAna의
+      # docker compose up -d 로 jibdaum-redis 컨테이너도 함께 띄워둘 것.
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
   jpa:
     hibernate:
       # Django 마이그레이션이 스키마를 소유한다. Spring이 스키마를 바꾸지 않도록 반드시 none 유지.

@@ -9,6 +9,7 @@ import com.jipdaum_spring.dto.product.ProductResponse;
 import com.jipdaum_spring.service.chat.ProductEmbeddingIndex;
 import com.jipdaum_spring.service.chat.ProductEmbeddingIndexInitializer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ public class AdminProductService {
     private final ProductEmbeddingIndex embeddingIndex;
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductResponse create(ProductCreateRequest request) {
         Category category = findCategory(request.categoryId());
         Product product = Product.builder()
@@ -43,6 +45,7 @@ public class AdminProductService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductResponse update(Long productId, ProductCreateRequest request) {
         Product product = findProduct(productId);
         Category category = findCategory(request.categoryId());
@@ -53,6 +56,7 @@ public class AdminProductService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public void delete(Long productId) {
         productRepository.delete(findProduct(productId));
         embeddingIndex.remove(productId);
