@@ -1,0 +1,55 @@
+
+⭐ Redis 캐싱, 협업자/보안 점검, 동시성 부하 테스트, 일정표 문서 (2026-09-03)
+
+✅ 상품 목록 조회에 Redis 캐싱 적용
+
+➡️ ProductService.getProducts를 30초 TTL로 캐싱(CacheConfig 신규). Django Admin이 같은 DB를
+   직접 쓰는 구조라 캐시 무효화 이벤트 연동 대신 TTL로 최종 일관성 선택
+➡️ 붙이자마자 실측으로 버그 2건 발견해 수정: (1) GenericJackson2JsonRedisSerializer 기본
+   ObjectMapper에 JSR-310 없어 LocalDateTime 필드에서 500 (2) WRITE_DATES_AS_TIMESTAMPS를
+   안 끄면 캐시 히트 때만 created_at이 배열로 나오는 회귀 — 둘 다 curl+diff로 직접 비교해 발견
+➡️ 배포 전 .github/workflows/docker-publish.yml을 먼저 읽어, EC2에 Redis가 없을 수 있고
+   application.yml이 git과 무관하게 호스트에 고정 마운트된다는 걸 확인 → CachingConfigurer.
+   errorHandler()로 캐시 실패를 로그만 남기고 삼키게 만들어 Redis 없이도 200 응답되는 것까지
+   실측 확인 후 배포(jipdaum_Springboot 4b83b31, aa3f580 / Team-DaumAna effc110)
+➡️ 실측: 상품 목록 조회 534ms(DB) → 28ms(캐시 히트), 약 19배. 33개 테스트 전부 통과
+➡️ 포트폴리오에 케이스 스터디로 문서화(jipdaum-redis-product-cache.md), Team-DaumAna에
+   jibdaum-redis 컨테이너 추가(docker-compose.yml)
+
+
+✅ 콜라보레이터 확인 중 JWT 시크릿 git 히스토리 노출 발견 — 조치 보류, 사용자 확인 대기
+
+➡️ jipdaum_Springboot: 협업자 0명(owner만). Team-DaumAna: 협업자 1명(LeoKang, push 권한)
+➡️ application.yml/.env/secret 이름의 파일 자체는 두 저장소 다 커밋된 적 없음(정상)
+➡️ 그런데 src/main/resources/application.yml.example에 실제 JWT 서명 키 문자열
+   ("django-insecure-n2jyixf9c...")이 2026-07-21(534b5af)부터 지금까지 커밋 히스토리에 남아있음
+   — Django SECRET_KEY와 반드시 같아야 토큰이 호환되는 값이라, 프로덕션이 이 값을 그대로
+   쓰고 있다면 이 문자열을 아는 사람은 유효 토큰을 위조할 수 있음
+➡️ 프로덕션 EC2의 실제 jwt.secret이 이 값과 같은지 확인 안 됨(EC2 접근 권한 없음) — 같다면
+   Django SECRET_KEY + Spring jwt.secret 동시 교체 + example 파일 값 제거 필요
+➡️ 협업자 추가/저장소 공개 전환은 노출 범위를 넓히는 방향이라 이 확인 전까지 보류
+➡️ backend/.env(Django 실제 시크릿 파일)는 gitignore 처리돼 안전함을 별도 확인
+
+
+✅ 재고 차감 동시성 방어 로직에 부하 테스트 추가 (ProductOptionConcurrencyTest)
+
+➡️ OrderService.verifyPayment이 쓰는 ProductOptionRepository.decrementStockIfAvailable
+   (DB 레벨 조건부 UPDATE)이 실제 동시 요청에서도 재고를 음수로 안 만드는지 검증
+➡️ 재고 5개 옵션에 20개 스레드를 CountDownLatch로 동시 출발시켜 각각 수량 1씩 차감 시도.
+   스레드마다 TransactionTemplate으로 독립 트랜잭션 사용(테스트 메서드를 @Transactional로
+   감싸면 한 트랜잭션 안 순차 실행이 되어 의미 없음)
+➡️ 가드를 일부러 지우고 돌려 뮤테이션 테스트 수행 — 발견: stock_count 컬럼이 DB 스키마상
+   BIGINT UNSIGNED라 가드 없이도 음수가 되는 순간 MySQL이 자체 에러를 던져 최종 재고 수치는
+   우연히 똑같이 나옴(이중 안전장치 존재). 다만 이 경우 앱은 조용한 "재고 0"이 아니라 SQL
+   예외로 죽어 같은 트랜잭션의 결제 완료 처리까지 롤백될 위험이 있음
+➡️ 그래서 테스트에 exceptionCount 검증도 추가 — 가드 제거 시 실제로 테스트가 실패하는 것까지
+   확인(AssertionFailedError: expected 0)한 뒤 가드 원상복구, 최종 34개 테스트 전부 통과
+
+
+✅ 일정표 문서 작성 (08_JIPDAUM_일정표.docx)
+
+➡️ 제출 설계문서(ERD/Class/Usecase/Sequence/UI정의서/기술스택) 옆에 일정표 추가
+➡️ 임의로 계획을 지어내지 않고 jipdaum_Springboot + Team-DaumAna 두 저장소의 실제 git log를
+   ISO 주차별로 집계해 7단계로 구성(6/22 기반구축 ~ 9/3 회귀방지·성능개선)
+➡️ 각 단계 커밋 수 합계가 두 저장소의 실제 총 커밋 수(Spring 90, DaumAna 195)와 정확히
+   일치하는지 검산 완료 후 python-docx로 생성, #Presentation_Document/.../설계문서/에 저장
