@@ -5,11 +5,13 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface CouponRepository extends JpaRepository<Coupon, Long> {
     Optional<Coupon> findByCodeAndIsPersonalFalse(String code);
     Optional<Coupon> findByCode(String code);
+    List<Coupon> findAllByCodeInAndIsActiveTrue(List<String> codes);
 
     /**
      * usageLimit을 넘지 않는 경우에만 원자적으로 usedCount를 1 증가시킨다.

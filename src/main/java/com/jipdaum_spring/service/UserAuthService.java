@@ -1,5 +1,9 @@
 package com.jipdaum_spring.service;
 
+import com.jipdaum_spring.domain.coupon.Coupon;
+import com.jipdaum_spring.domain.coupon.CouponRepository;
+import com.jipdaum_spring.domain.coupon.UserCoupon;
+import com.jipdaum_spring.domain.coupon.UserCouponRepository;
 import com.jipdaum_spring.domain.jipdaumuser.EmailOtp;
 import com.jipdaum_spring.domain.jipdaumuser.EmailOtpRepository;
 import com.jipdaum_spring.domain.jipdaumuser.JipdaumUser;
@@ -7,6 +11,7 @@ import com.jipdaum_spring.domain.jipdaumuser.JipdaumUserRepository;
 import com.jipdaum_spring.domain.token.BlacklistedToken;
 import com.jipdaum_spring.domain.token.BlacklistedTokenRepository;
 import com.jipdaum_spring.dto.auth.*;
+import com.jipdaum_spring.dto.coupon.MyCouponResponse;
 import com.jipdaum_spring.exception.AuthException;
 import com.jipdaum_spring.exception.FieldValidationException;
 import com.jipdaum_spring.security.CurrentUserProvider;
@@ -32,6 +37,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Django Users 앱(회원가입/로그인/로그아웃/닉네임 중복확인/이메일 OTP)을 포팅한 서비스.
@@ -45,10 +51,15 @@ public class UserAuthService {
 
     private static final long OTP_TTL_SECONDS = 300;
     private static final SecureRandom RANDOM = new SecureRandom();
+    // 회원가입 시 자동 지급되는 웰컴 쿠폰 코드. Django backend/coupons 시드 데이터(0002_seed_coupons)와 맞춰야 한다.
+    private static final List<String> WELCOME_COUPON_CODES =
+            List.of("WELCOME30", "WELCOME15", "WELCOME10", "WELCOME1MAN", "WELCOME5000");
 
     private final JipdaumUserRepository jipdaumUserRepository;
     private final EmailOtpRepository emailOtpRepository;
     private final BlacklistedTokenRepository blacklistedTokenRepository;
+    private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
     private final JipdaumUserProvisioner jipdaumUserProvisioner;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
@@ -89,7 +100,29 @@ public class UserAuthService {
         String passwordHash = passwordEncoder.encode(request.password());
         jipdaumUserProvisioner.createLocalUser(username, passwordHash, email, nickname);
 
-        return new RegisterResponse(nickname, email);
+        JipdaumUser newUser = jipdaumUserRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "회원 생성에 실패했습니다."));
+        List<MyCouponResponse> issuedCoupons = issueWelcomeCoupons(newUser);
+
+        return new RegisterResponse(nickname, email, issuedCoupons);
+    }
+
+    /** 가입 완료 직후 웰컴 쿠폰을 계정에 지급하고, 화면에 바로 보여줄 수 있게 지급 내역을 반환한다. */
+    private List<MyCouponResponse> issueWelcomeCoupons(JipdaumUser user) {
+        List<Coupon> coupons = couponRepository.findAllByCodeInAndIsActiveTrue(WELCOME_COUPON_CODES);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<UserCoupon> issued = coupons.stream().map(coupon -> {
+            UserCoupon uc = new UserCoupon();
+            uc.setUser(user);
+            uc.setCoupon(coupon);
+            uc.setIsUsed(false);
+            uc.setCreatedAt(now);
+            return uc;
+        }).toList();
+
+        userCouponRepository.saveAll(issued);
+        return issued.stream().map(MyCouponResponse::from).toList();
     }
 
     @Transactional
