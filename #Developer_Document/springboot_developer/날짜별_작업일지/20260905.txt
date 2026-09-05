@@ -1,0 +1,31 @@
+
+⭐ 프론트 쿠폰 기능 대조 검증, Checkout 쿠폰코드 미전송 버그 발견/수정 (2026-09-05)
+
+✅ 프론트(Team-DaumAna) 쿠폰 기능이 백엔드(jipdaum_Springboot)와 실제로 맞물리는지 대조 검증
+
+➡️ Cart.jsx/Checkout.jsx/CouponDrawer.jsx/api.js가 쓰는 엔드포인트(GET /coupons/my,
+   POST /coupons/validate, POST /orders/create의 coupon_code)와 필드명(discount_type,
+   discount_value, coupon_name 등)을 CouponController/CouponService/MyCouponResponse/
+   OrderService와 한 줄씩 대조 — 엔드포인트·필드명은 이미 다 일치함을 확인
+➡️ 이 백엔드 코드는 이미 예전 커밋(a14c44f)부터 main에 있었고, jipdaum_Springboot는
+   git status 기준 이미 origin과 clean/up-to-date. gh run list로 최근 배포 워크플로우
+   (85ff053, 2026-09-03)가 success인 것까지 확인 — 백엔드 쪽은 EC2에 이미 최신 반영돼
+   있어 추가로 커밋/재배포할 게 없었음
+
+✅ Checkout.jsx에서 쿠폰 적용해도 실제 주문엔 반영 안 되는 버그 발견 → 보고 후 수정 허락받고 수정
+
+➡️ 원인: POST /coupons/validate 응답(ValidateCouponResponse)엔 valid/message/
+   discount_amount/coupon_name만 있고 code/name 필드가 없는데, handleSelectCoupon·
+   handleApplyCouponCode가 이 응답을 그대로 appliedCoupon에 저장해둠
+➡️ 그 결과 handlePay()가 보내는 coupon_code: appliedCoupon?.code가 항상 undefined →
+   ""로 치환되어 전송 — 화면엔 "OOO 적용 — N원 할인"이 표시되지만 실제 주문 생성
+   요청에는 쿠폰 코드가 안 실려 쿠폰이 반영 안 됨(할인 문구도 appliedCoupon.name이
+   없어 사실은 빈 값이었음)
+➡️ 수정: 두 핸들러에서 res.data에 실제 사용한 code와 res.data.coupon_name을 name으로
+   합쳐서 appliedCoupon에 저장하도록 변경(Team-DaumAna 9d1297f). 이 저장소의 다른
+   미커밋 변경(App.jsx, Cart.css 등)은 이 세션이 만든 게 아니라 손대지 않고 Checkout.jsx
+   한 파일만 커밋
+➡️ Cloudflare Pages(프론트 배포 파이프라인)가 push마다 저장소를 직접 연동해 자체
+   빌드/배포 — gh api check-runs로 9d1297f 커밋의 Cloudflare Pages check-run이
+   "Deployed successfully"인 것까지 확인. deploy.yml(GitHub Actions)은 이름과
+   달리 프론트가 아니라 Django 백엔드 전용이라는 점도 재확인
