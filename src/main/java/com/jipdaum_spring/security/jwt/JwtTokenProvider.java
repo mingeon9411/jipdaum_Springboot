@@ -15,6 +15,8 @@ public class JwtTokenProvider {
 
     public static final String TYPE_ACCESS = "access";
     public static final String TYPE_REFRESH = "refresh";
+    public static final String TYPE_PW_RESET = "pw_reset";
+    private static final long PW_RESET_EXPIRATION_MS = 10 * 60 * 1000;
 
     @Value("${jwt.secret}")
     private String secret;
@@ -63,6 +65,17 @@ public class JwtTokenProvider {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 비밀번호 찾기 본인확인 통과 후 발급하는 단기(10분) 토큰 — 새 테이블 없이 기존 JWT로 재사용한다. */
+    public String generatePasswordResetToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .claim("type", TYPE_PW_RESET)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + PW_RESET_EXPIRATION_MS))
+                .signWith(getSigningKey())
+                .compact();
     }
 
     // 기존 호환성 유지

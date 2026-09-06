@@ -9,6 +9,8 @@ public record RegisterRequest(
         @NotBlank(message = "이메일을 입력해주세요.") @Email(message = "올바른 이메일 형식이 아닙니다.") String email,
         @NotBlank(message = "비밀번호를 입력해주세요.") String password,
         @JsonProperty("password_confirm") @NotBlank(message = "비밀번호 확인을 입력해주세요.") String passwordConfirm,
+        @JsonProperty("security_question") @NotBlank(message = "보안 질문을 선택해주세요.") String securityQuestion,
+        @JsonProperty("security_answer") @NotBlank(message = "보안 질문의 답변을 입력해주세요.") String securityAnswer,
         @JsonProperty("recaptcha_token") String recaptchaToken
 ) {
 }

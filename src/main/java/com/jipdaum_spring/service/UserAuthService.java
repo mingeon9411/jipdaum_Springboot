@@ -51,9 +51,19 @@ public class UserAuthService {
 
     private static final long OTP_TTL_SECONDS = 300;
     private static final SecureRandom RANDOM = new SecureRandom();
-    // 회원가입 시 자동 지급되는 웰컴 쿠폰 코드. Django backend/coupons 시드 데이터(0002_seed_coupons)와 맞춰야 한다.
+    // 회원가입 시 자동 지급되는 웰컴 쿠폰 코드 — 15%/30% 할인 쿠폰 각 1장.
+    // Django backend/coupons 시드 데이터(0002_seed_coupons)와 코드가 맞아야 한다.
     private static final List<String> WELCOME_COUPON_CODES =
-            List.of("WELCOME30", "WELCOME15", "WELCOME10", "WELCOME1MAN", "WELCOME5000");
+            List.of("WELCOME15", "WELCOME30");
+    // 아이디/비밀번호 찾기 본인확인용 보안질문 고정 목록 — 프론트
+    // frontend/src/data/securityQuestions.js와 반드시 동일해야 한다.
+    private static final List<String> SECURITY_QUESTIONS = List.of(
+            "가장 좋아하는 음식은?",
+            "첫 반려동물의 이름은?",
+            "출신 초등학교는?",
+            "가장 기억에 남는 여행지는?",
+            "어머니의 성함은?"
+    );
 
     private final JipdaumUserRepository jipdaumUserRepository;
     private final EmailOtpRepository emailOtpRepository;
@@ -95,6 +105,9 @@ public class UserAuthService {
             throw new FieldValidationException("password_confirm", "비밀번호가 일치하지 않습니다.");
         }
         validatePasswordStrength(request.password(), email, nickname);
+        if (!SECURITY_QUESTIONS.contains(request.securityQuestion())) {
+            throw new FieldValidationException("security_question", "보안 질문을 목록에서 선택해주세요.");
+        }
 
         String username = generateUsername(email);
         String passwordHash = passwordEncoder.encode(request.password());
@@ -102,6 +115,9 @@ public class UserAuthService {
 
         JipdaumUser newUser = jipdaumUserRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "회원 생성에 실패했습니다."));
+        newUser.setSecurityQuestion(request.securityQuestion());
+        newUser.setSecurityAnswer(passwordEncoder.encode(normalizeAnswer(request.securityAnswer())));
+        jipdaumUserRepository.save(newUser);
         List<MyCouponResponse> issuedCoupons = issueWelcomeCoupons(newUser);
 
         return new RegisterResponse(nickname, email, issuedCoupons);
@@ -209,10 +225,27 @@ public class UserAuthService {
         if (email.isEmpty()) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "이메일을 입력해주세요.");
         }
+        issueAndSendOtp(user.getId(), email);
+    }
 
+    @Transactional
+    public EmailOtpVerifyResponse verifyEmailOtp(EmailOtpVerifyRequest request) {
+        JipdaumUser user = currentUserProvider.getCurrentUser();
+        String email = request.email().trim();
+        String code = request.code().trim();
+
+        consumeOtp(user.getId(), email, code);
+
+        user.setEmailVerified(true);
+        jipdaumUserRepository.save(user);
+        return new EmailOtpVerifyResponse("이메일 인증이 완료되었습니다.", user.getSecurityQuestion() != null);
+    }
+
+    /** 6자리 코드를 발급/저장하고 메일로 보낸다 — 로그인 사용자용(sendEmailOtp)과 아이디 찾기(비로그인) 양쪽에서 재사용. */
+    private void issueAndSendOtp(Long userId, String email) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        emailOtpRepository.deleteAllByUserIdAndUsedFalse(user.getId());
-        emailOtpRepository.save(new EmailOtp(user.getId(), email, code));
+        emailOtpRepository.deleteAllByUserIdAndUsedFalse(userId);
+        emailOtpRepository.save(new EmailOtp(userId, email, code));
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -242,14 +275,10 @@ public class UserAuthService {
         }
     }
 
-    @Transactional
-    public void verifyEmailOtp(EmailOtpVerifyRequest request) {
-        JipdaumUser user = currentUserProvider.getCurrentUser();
-        String email = request.email().trim();
-        String code = request.code().trim();
-
+    /** 코드를 검증하고 사용 처리한다. 틀렸거나 만료됐으면 예외를 던진다. */
+    private void consumeOtp(Long userId, String email, String code) {
         EmailOtp otp = emailOtpRepository
-                .findFirstByUserIdAndEmailAndCodeAndUsedFalseOrderByCreatedAtDesc(user.getId(), email, code)
+                .findFirstByUserIdAndEmailAndCodeAndUsedFalseOrderByCreatedAtDesc(userId, email, code)
                 .orElseThrow(() -> new AuthException(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."));
 
         if (otp.getCreatedAt().plusSeconds(OTP_TTL_SECONDS).isBefore(LocalDateTime.now())) {
@@ -258,8 +287,98 @@ public class UserAuthService {
 
         otp.setUsed(true);
         emailOtpRepository.save(otp);
+    }
 
-        user.setEmailVerified(true);
+    /** 답변 비교는 대소문자/앞뒤 공백 차이를 관대하게 허용한다. */
+    private String normalizeAnswer(String answer) {
+        return answer.trim().toLowerCase();
+    }
+
+    private boolean matchesAnswer(String rawAnswer, String storedHash) {
+        return storedHash != null && passwordEncoder.matches(normalizeAnswer(rawAnswer), storedHash);
+    }
+
+    /** 아이디/비밀번호 찾기 첫 화면에서 보안 질문 텍스트를 보여주기 위한 조회. 계정 유무를 과다 노출하지 않게 오류 문구를 통일한다. */
+    @Transactional(readOnly = true)
+    public SecurityQuestionResponse getSecurityQuestion(String rawEmail) {
+        String email = rawEmail == null ? "" : rawEmail.trim();
+        JipdaumUser user = jipdaumUserRepository.findByEmail(email).orElse(null);
+        if (user == null || user.getSecurityQuestion() == null) {
+            throw new AuthException(HttpStatus.BAD_REQUEST,
+                    "가입되지 않은 이메일이거나 보안 질문이 설정되지 않았습니다. 로그인 후 마이페이지에서 먼저 설정해주세요.");
+        }
+        return new SecurityQuestionResponse(user.getSecurityQuestion());
+    }
+
+    /** 아이디 찾기 1단계: 이메일로 인증코드 발송. 미가입 이메일이어도 존재 여부를 노출하지 않도록 동일하게 성공 처리한다. */
+    @Transactional
+    public void sendFindIdCode(String rawEmail) {
+        String email = rawEmail == null ? "" : rawEmail.trim();
+        JipdaumUser user = jipdaumUserRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return;
+        }
+        issueAndSendOtp(user.getId(), email);
+    }
+
+    /** 아이디 찾기 2단계: 인증코드 + 보안답 확인 후 username(로그인 아이디)을 돌려준다. */
+    @Transactional
+    public FindIdResponse verifyFindId(FindIdVerifyRequest request) {
+        String email = request.email().trim();
+        JipdaumUser user = jipdaumUserRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthException(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."));
+
+        // 보안답부터 확인 — 순서를 바꾸면 답을 틀렸을 때도 코드가 소모돼, 맞는 코드인데도
+        // 재발송을 새로 받아야 하는 UX 버그가 생긴다.
+        if (!matchesAnswer(request.securityAnswer(), user.getSecurityAnswer())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 질문 답변이 일치하지 않습니다.");
+        }
+        consumeOtp(user.getId(), email, request.code().trim());
+        return new FindIdResponse(user.getUsername());
+    }
+
+    /**
+     * 비밀번호 찾기 본인확인: 닉네임+이메일+보안답이 모두 일치해야 통과.
+     * 통과 시 새 비밀번호를 그 자리에서 입력받기 위한 단기(10분) 토큰을 내려준다.
+     */
+    @Transactional(readOnly = true)
+    public FindPasswordVerifyResponse verifyFindPasswordIdentity(FindPasswordVerifyRequest request) {
+        JipdaumUser user = jipdaumUserRepository
+                .findByNicknameAndEmail(request.nickname().trim(), request.email().trim())
+                .orElseThrow(() -> new AuthException(HttpStatus.BAD_REQUEST, "일치하는 회원 정보가 없습니다."));
+
+        if (!matchesAnswer(request.securityAnswer(), user.getSecurityAnswer())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 질문 답변이 일치하지 않습니다.");
+        }
+        return new FindPasswordVerifyResponse(jwtTokenProvider.generatePasswordResetToken(user.getEmail()));
+    }
+
+    /** 본인확인을 통과해 받은 단기 토큰으로 실제 비밀번호를 변경한다. */
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String token = request.resetToken();
+        if (!JwtTokenProvider.TYPE_PW_RESET.equals(jwtTokenProvider.getType(token))
+                || !jwtTokenProvider.validate(token)) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "본인확인이 만료되었습니다. 처음부터 다시 시도해주세요.");
+        }
+        String email = jwtTokenProvider.getEmail(token);
+        JipdaumUser user = jipdaumUserRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthException(HttpStatus.BAD_REQUEST, "회원을 찾을 수 없습니다."));
+
+        validatePasswordStrength(request.newPassword(), user.getEmail(), user.getNickname());
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        jipdaumUserRepository.save(user);
+    }
+
+    /** 로그인한 회원이 보안 질문을 최초 설정하거나 바꾼다(로그인 직후 안내 화면, 마이페이지 양쪽에서 재사용). */
+    @Transactional
+    public void updateSecurityQa(SecurityQaRequest request) {
+        if (!SECURITY_QUESTIONS.contains(request.securityQuestion())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "보안 질문을 목록에서 선택해주세요.");
+        }
+        JipdaumUser user = currentUserProvider.getCurrentUser();
+        user.setSecurityQuestion(request.securityQuestion());
+        user.setSecurityAnswer(passwordEncoder.encode(normalizeAnswer(request.securityAnswer())));
         jipdaumUserRepository.save(user);
     }
 

@@ -8,7 +8,8 @@ public record UserSummaryResponse(
         String username,
         String nickname,
         String email,
-        @JsonProperty("is_email_verified") boolean emailVerified
+        @JsonProperty("is_email_verified") boolean emailVerified,
+        @JsonProperty("has_security_question") boolean hasSecurityQuestion
 ) {
     public static UserSummaryResponse from(JipdaumUser user) {
         return new UserSummaryResponse(
@@ -16,7 +17,8 @@ public record UserSummaryResponse(
                 user.getUsername(),
                 user.getNickname(),
                 user.getEmail(),
-                Boolean.TRUE.equals(user.getEmailVerified())
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                user.getSecurityQuestion() != null
         );
     }
 }

@@ -75,7 +75,8 @@ class UserAuthServiceTest {
         when(couponRepository.findAllByCodeInAndIsActiveTrue(any())).thenReturn(List.of(welcome10, welcome1man));
 
         RegisterResponse response = service.register(new RegisterRequest(
-                "새회원", "new@jipdaum.com", "password123", "password123", "captcha-token"));
+                "새회원", "new@jipdaum.com", "password123", "password123",
+                "가장 좋아하는 음식은?", "떡볶이", "captcha-token"));
 
         ArgumentCaptor<List<UserCoupon>> savedCaptor = ArgumentCaptor.forClass(List.class);
         org.mockito.Mockito.verify(userCouponRepository).saveAll(savedCaptor.capture());

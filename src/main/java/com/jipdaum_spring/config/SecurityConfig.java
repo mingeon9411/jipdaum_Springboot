@@ -87,7 +87,10 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**", "/login/**",
                                 "/api/auth/refresh", "/api/auth/social-exchange", "/api/auth/social-captcha",
                                 "/api/users/register", "/api/users/login",
-                                "/api/users/me", "/api/users/nickname-check").permitAll()
+                                "/api/users/me", "/api/users/nickname-check",
+                                // 아이디/비밀번호 찾기 — 로그인 전 상태에서 호출되므로 공개 필요.
+                                "/api/users/security-question", "/api/users/find-id/**",
+                                "/api/users/find-password/**").permitAll()
                         // 업로드된 리뷰 사진 등은 정적 파일 서빙이라 비로그인 방문자도 볼 수 있어야 한다.
                         // (업로드 자체는 /api/shop/uploads/**로, 아래 /api/shop/** authenticated 규칙에 걸린다)
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
@@ -97,7 +100,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/shop/products/**").permitAll()
                         .requestMatchers("/api/shop/chat").permitAll()
                         .requestMatchers("/api/shop/**").authenticated()
-                        .requestMatchers("/api/users/logout", "/api/users/withdraw", "/api/users/email-verify/**").authenticated()
+                        .requestMatchers("/api/users/logout", "/api/users/withdraw", "/api/users/email-verify/**",
+                                "/api/users/security-qa").authenticated()
                         .requestMatchers("/api/admin/**", "/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

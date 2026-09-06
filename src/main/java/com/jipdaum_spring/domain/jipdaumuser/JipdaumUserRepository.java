@@ -11,4 +11,5 @@ public interface JipdaumUserRepository extends JpaRepository<JipdaumUser, Long> 
     Optional<JipdaumUser> findByUsername(String username);
     boolean existsByNickname(String nickname);
     boolean existsByEmail(String email);
+    Optional<JipdaumUser> findByNicknameAndEmail(String nickname, String email);
 }

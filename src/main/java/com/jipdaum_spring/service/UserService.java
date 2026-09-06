@@ -64,7 +64,9 @@ public class UserService {
                 jipdaumUser.getNickname(),
                 jipdaumUser.getNickname(),
                 springUser != null && springUser.getProfileImage() != null ? springUser.getProfileImage() : "",
-                springUser != null ? springUser.getProvider() : ""
+                springUser != null ? springUser.getProvider() : "",
+                jipdaumUser.getSecurityQuestion() != null,
+                jipdaumUser.getSecurityQuestion()
         );
     }
 }
