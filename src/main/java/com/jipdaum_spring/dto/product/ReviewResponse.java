@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public record ReviewResponse(
         Long id,
         Long product,
+        @JsonProperty("product_name") String productName,
+        @JsonProperty("product_thumbnail_url") String productThumbnailUrl,
         Long user,
         @JsonProperty("user_nickname") String userNickname,
         Integer rating,
@@ -20,6 +22,8 @@ public record ReviewResponse(
         return new ReviewResponse(
                 r.getId(),
                 r.getProduct().getId(),
+                r.getProduct().getName(),
+                r.getProduct().getThumbnailUrl(),
                 r.getUser() != null ? r.getUser().getId() : null,
                 r.getUser() != null ? r.getUser().getNickname() : "",
                 r.getRating(),

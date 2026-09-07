@@ -105,8 +105,8 @@ hcaptcha:
 jwt:
   # Django SIMPLE_JWT의 SIGNING_KEY(=SECRET_KEY, backend/.env)와 반드시 동일해야 토큰이 양쪽에서 호환된다.
   secret: '***REMOVED_SECRET***'
-  expiration: 7200000
-  refresh-expiration: 604800000
+  expiration: 900000
+  refresh-expiration: 86400000
 
 portone:
   api-secret: dummy-portone-api-secret

@@ -48,6 +48,11 @@ public class ProductController {
         return ResponseEntity.ok(productService.getPhotoReviews());
     }
 
+    @GetMapping("/reviews/recent")
+    public ResponseEntity<?> getRecentReviews() {
+        return ResponseEntity.ok(productService.getRecentReviews());
+    }
+
     @PostMapping("/{id}/reviews")
     public ResponseEntity<?> createReview(@PathVariable Long id, @Valid @RequestBody CreateReviewRequest request) {
         return ResponseEntity.status(201).body(productService.createReview(id, request));

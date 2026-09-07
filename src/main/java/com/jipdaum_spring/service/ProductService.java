@@ -108,6 +108,13 @@ public class ProductService {
                 .toList();
     }
 
+    /** 룩북 아래 리뷰 모음용 — 사진 유무와 관계없이 모든 상품 리뷰를 최신순으로 조회한다. */
+    public List<ReviewResponse> getRecentReviews() {
+        return reviewRepository.findTop100ByOrderByCreatedAtDesc().stream()
+                .map(ReviewResponse::from)
+                .toList();
+    }
+
     @Transactional
     public CreateReviewResponse createReview(Long productId, CreateReviewRequest request) {
         Product product = productRepository.findById(productId)
