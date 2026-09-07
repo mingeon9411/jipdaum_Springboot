@@ -66,6 +66,10 @@ public class Payment {
         this.paidAt = LocalDateTime.now();
     }
 
+    public void fail() {
+        this.status = "FAILED";
+    }
+
     public String getMethodDisplay() {
         if (method == null) return null;
         return switch (method) {

@@ -62,6 +62,7 @@ class OrderServiceTest {
             ReflectionTestUtils.setField(order, "id", 100L);
             return order;
         });
+        lenient().when(productOptionRepository.decrementStockIfAvailable(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(1);
     }
 
     private Product productWithPrice(Integer basePrice) {
@@ -173,7 +174,7 @@ class OrderServiceTest {
                 .order(null).user(otherUser).method("CARD").status("PENDING").amount(10000)
                 .build();
 
-        when(paymentRepository.findByMerchantUid("uid-1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByMerchantUidForUpdate("uid-1")).thenReturn(Optional.of(payment));
 
         PaymentVerifyRequest request = new PaymentVerifyRequest("pay-1", "uid-1");
 

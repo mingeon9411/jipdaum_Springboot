@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -79,6 +80,8 @@ public class OrderService {
                         "'" + product.getName() + "' 가격 정보가 올바르지 않습니다.");
 
             if (option != null) {
+                if (!Objects.equals(option.getProduct().getId(), product.getId()))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "선택한 옵션이 상품에 속하지 않습니다.");
                 if (option.getStockCount() == null)
                     throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                             "'" + product.getName() + "' 재고 정보가 올바르지 않습니다.");
@@ -130,6 +133,11 @@ public class OrderService {
                     .quantity(r.qty()).orderedPrice(r.unitPrice()).build());
         }
 
+        for (Resolved r : resolved) {
+            if (r.option() != null && productOptionRepository.decrementStockIfAvailable(r.option().getId(), r.qty()) == 0)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "상품 재고가 부족합니다.");
+        }
+
         // usageLimit/1인당 사용 여부는 DB 레벨 조건부 UPDATE로 원자적으로 확정한다.
         // 동시 요청이 같은 쿠폰을 함께 통과시키는 race condition을 막기 위함이며,
         // 실패 시 예외로 트랜잭션 전체(주문 생성 포함)를 롤백시킨다.
@@ -150,7 +158,12 @@ public class OrderService {
                     .ifPresent(cartRepository::delete);
         }
 
-        return new CreateOrderResponse(order.getId(), order.getTotalAmount());
+        boolean paymentRequired = order.getTotalAmount() > 0;
+        if (!paymentRequired) {
+            order.complete();
+            orderRepository.save(order);
+        }
+        return new CreateOrderResponse(order.getId(), order.getTotalAmount(), paymentRequired);
     }
 
     @Transactional
@@ -178,11 +191,14 @@ public class OrderService {
     public MessageResponse verifyPayment(PaymentVerifyRequest request) {
         JipdaumUser user = getCurrentUser();
 
-        Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
+        Payment payment = paymentRepository.findByMerchantUidForUpdate(request.merchantUid())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "결제 정보를 찾을 수 없습니다."));
 
         if (payment.getUser() == null || !payment.getUser().getId().equals(user.getId()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 결제만 확인할 수 있습니다.");
+
+        if (!request.paymentId().equals(request.merchantUid()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "결제 식별자가 일치하지 않습니다.");
 
         if ("SUCCESS".equals(payment.getStatus()))
             return new MessageResponse("이미 처리된 결제입니다.");
@@ -222,15 +238,6 @@ public class OrderService {
 
         // 실제 돈이 오간 뒤이므로 재고가 이미 바닥났더라도 주문 자체는 되돌리지 않는다(환불 절차 없음).
         // 다만 이후 주문의 재고 확인이 정확하도록 원자적으로 차감하고, 소진된 경우 운영 로그로 남긴다.
-        for (OrderItem item : order.getItems()) {
-            if (item.getOption() == null) continue;
-            int updated = productOptionRepository.decrementStockIfAvailable(item.getOption().getId(), item.getQuantity());
-            if (updated == 0) {
-                log.warn("재고 부족 상태에서 결제가 완료됨 - orderId={}, optionId={}, qty={}",
-                        order.getId(), item.getOption().getId(), item.getQuantity());
-            }
-        }
-
         return new MessageResponse("결제가 완료되었습니다.");
     }
 
@@ -241,9 +248,23 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
         if (!"PENDING".equals(order.getStatus()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입금대기 상태의 주문만 취소할 수 있습니다.");
+        if (paymentRepository.findByOrder(order).isPresent())
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "결제가 시작된 주문은 결제 결과 확인 후 취소할 수 있습니다.");
         order.cancel();
+        releaseOrderResources(order);
         orderRepository.save(order);
         return new CancelOrderResponse("주문이 취소되었습니다.", orderId);
+    }
+
+    private void releaseOrderResources(Order order) {
+        for (OrderItem item : order.getItems()) {
+            if (item.getOption() != null)
+                productOptionRepository.incrementStock(item.getOption().getId(), item.getQuantity());
+        }
+        if (order.getCoupon() != null) {
+            couponRepository.decrementUsedCountIfPositive(order.getCoupon().getId());
+            userCouponRepository.markUnusedIfUsed(order.getUser(), order.getCoupon());
+        }
     }
 
     @Transactional(readOnly = true)

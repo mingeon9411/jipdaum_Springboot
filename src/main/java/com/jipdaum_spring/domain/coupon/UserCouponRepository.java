@@ -22,4 +22,9 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
     @Query("UPDATE UserCoupon uc SET uc.isUsed = true, uc.usedAt = :usedAt " +
            "WHERE uc.id = :id AND uc.isUsed = false")
     int markUsedIfAvailable(@Param("id") Long id, @Param("usedAt") LocalDateTime usedAt);
+
+    @Modifying
+    @Query("UPDATE UserCoupon uc SET uc.isUsed = false, uc.usedAt = null " +
+           "WHERE uc.user = :user AND uc.coupon = :coupon AND uc.isUsed = true")
+    int markUnusedIfUsed(@Param("user") JipdaumUser user, @Param("coupon") Coupon coupon);
 }
