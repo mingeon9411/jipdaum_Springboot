@@ -5,6 +5,7 @@ import com.jipdaum_spring.dto.auth.EmailOtpVerifyRequest;
 import com.jipdaum_spring.dto.auth.FindIdSendCodeRequest;
 import com.jipdaum_spring.dto.auth.FindIdVerifyRequest;
 import com.jipdaum_spring.dto.auth.FindPasswordVerifyRequest;
+import com.jipdaum_spring.dto.auth.IdentityVerificationVerifyRequest;
 import com.jipdaum_spring.dto.auth.LoginRequest;
 import com.jipdaum_spring.dto.auth.LoginResponse;
 import com.jipdaum_spring.dto.auth.LogoutRequest;
@@ -17,6 +18,7 @@ import com.jipdaum_spring.dto.auth.WithdrawRequest;
 import com.jipdaum_spring.dto.common.MessageResponse;
 import com.jipdaum_spring.service.UserAuthService;
 import com.jipdaum_spring.service.UserService;
+import com.jipdaum_spring.service.IdentityVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +33,7 @@ public class UserController {
 
     private final UserAuthService userAuthService;
     private final UserService userService;
+    private final IdentityVerificationService identityVerificationService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
@@ -100,6 +103,12 @@ public class UserController {
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         userAuthService.resetPassword(request);
         return ResponseEntity.ok(new MessageResponse("비밀번호가 재설정되었습니다."));
+    }
+
+    @PostMapping("/identity-verification/verify")
+    public ResponseEntity<?> verifyIdentityVerification(
+            @Valid @RequestBody IdentityVerificationVerifyRequest request) {
+        return ResponseEntity.ok(identityVerificationService.verify(request));
     }
 
     @PatchMapping("/security-qa")

@@ -90,7 +90,7 @@ public class SecurityConfig {
                                 "/api/users/me", "/api/users/nickname-check",
                                 // 아이디/비밀번호 찾기 — 로그인 전 상태에서 호출되므로 공개 필요.
                                 "/api/users/security-question", "/api/users/find-id/**",
-                                "/api/users/find-password/**").permitAll()
+                                "/api/users/find-password/**", "/api/users/identity-verification/**").permitAll()
                         // 업로드된 리뷰 사진 등은 정적 파일 서빙이라 비로그인 방문자도 볼 수 있어야 한다.
                         // (업로드 자체는 /api/shop/uploads/**로, 아래 /api/shop/** authenticated 규칙에 걸린다)
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
