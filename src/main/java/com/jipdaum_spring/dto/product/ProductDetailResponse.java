@@ -15,6 +15,7 @@ public record ProductDetailResponse(
         @JsonProperty("thumbnail_url") String thumbnailUrl,
         Long category,
         @JsonProperty("category_name") String categoryName,
+        @JsonProperty("same_day_shipping") boolean sameDayShipping,
         @JsonProperty("created_at") LocalDateTime createdAt,
         List<ProductOptionSummary> options
 ) {
@@ -28,6 +29,7 @@ public record ProductDetailResponse(
                 p.getThumbnailUrl(),
                 p.getCategory() != null ? p.getCategory().getId() : null,
                 p.getCategory() != null ? p.getCategory().getName() : null,
+                p.isSameDayShipping(),
                 p.getCreatedAt(),
                 p.getOptions().stream().map(ProductOptionSummary::from).toList()
         );

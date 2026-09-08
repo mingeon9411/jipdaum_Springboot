@@ -47,6 +47,9 @@ public class Product {
     @Column(name = "collection")
     private String collection;
 
+    @Column(name = "same_day_shipping")
+    private boolean sameDayShipping;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
