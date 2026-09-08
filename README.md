@@ -9,7 +9,8 @@
 
 <p>
 <code>Team-DaumAna</code>와 <b>같은 MySQL 인스턴스</b>를 공유하는 듀얼 백엔드 구조에서,<br/>
-패스워드 인증을 제외한 <b>상품 · 장바구니 · 주문 · 결제 · 쿠폰 · 소셜 로그인 · AI 챗봇</b>을 전담합니다.
+회원가입 · 로그인 · 소셜 로그인 · 상품 · 장바구니 · 주문 · 결제 · 쿠폰 · AI 챗봇 등
+<b>서비스 API 전체</b>를 전담합니다.
 </p>
 
 </div>
@@ -31,7 +32,7 @@
 
 [![](https://skillicons.dev/icons?i=mysql)](https://skillicons.dev)
 <br/>
-<sub>MySQL — Django(회원 · 상품 마스터) · Spring Boot(장바구니 · 주문 · 결제) 공용, 스키마는 Django 마이그레이션 소유(`ddl-auto: none`)</sub>
+<sub>MySQL — Django Admin · Spring Boot가 공용으로 사용하며, 스키마 마이그레이션은 Django가 소유(`ddl-auto: none`)</sub>
 
 **Auth**
 
@@ -39,7 +40,7 @@
 ![Naver](https://img.shields.io/badge/Naver-03C75A?style=flat-square&logo=naver&logoColor=white)
 ![Google](https://img.shields.io/badge/Google-4285F4?style=flat-square&logo=google&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
-&nbsp;<sub>Spring OAuth2 Client + JJWT, Django 발급 JWT와 secret 공유로 양쪽 서버 상호 인식</sub>
+&nbsp;<sub>Spring OAuth2 Client + JJWT, Spring Boot가 JWT 발급·검증 전담(Django는 API에 관여하지 않음)</sub>
 
 **AI 챗봇**
 
@@ -65,23 +66,23 @@
 
 ## 🏠 담당 기능
 
-Django ↔ Spring 기능 분담 배경은 [`HANDOFF_AUTH_SCOPE.md`](HANDOFF_AUTH_SCOPE.md) 참고.
-요지: **패스워드 인증**(회원가입 · 로그인 · 로그아웃 · 닉네임체크 · 이메일OTP)만 Django에 남고,
-**나머지 전부**는 Spring Boot 담당입니다.
+Django ↔ Spring 기능 분담은 현재 다음과 같습니다. Django는 관리자 화면과 MySQL 스키마
+마이그레이션만 담당하고, 프론트엔드가 사용하는 회원·상품·주문·결제·쿠폰·챗봇 API는
+모두 Spring Boot가 담당합니다.
 
 **Spring Boot API** &nbsp;`Port 8081`
 
 | | |
 |---|---|
-| 🔐 **인증** | 소셜 로그인(카카오 · 네이버 · 구글) 토큰 교환, hCaptcha 검증, JWT 리프레시 — Django 발급 JWT와 상호 호환 |
-| 🛍 **상품** | 검색(진열/collection 스코프 — 메인 · 한국관) · 카테고리 필터 · 상품 상세 · 리뷰 조회 · 작성 |
+| 🔐 **인증** | 회원가입 · 일반 로그인 · 로그아웃 · 탈퇴 · 닉네임 중복확인 · 이메일 OTP · 아이디/비밀번호 찾기 · 본인인증 · 소셜 로그인(카카오 · 네이버 · 구글) · hCaptcha · JWT 리프레시 |
+| 🛍 **상품** | 검색(진열/collection 스코프) · 카테고리 필터 · 상품 상세 · 리뷰 조회 · 작성 |
 | 🛒 **장바구니** | 조회 · 추가 · 수정 · 삭제 |
 | 📦 **주문 · 결제** | 주문 생성 · PortOne V2 결제 준비/검증 · 결제 완료 · 취소 · 주문 내역 |
 | 🎟 **쿠폰** | 내 쿠폰 조회 · 쿠폰 검증 |
 | 🤖 **AI 챗봇** | Gemini 기반 상품 상담 — RAG 임베딩 의미 검색 + 함수 호출로 상품 추천/상세 안내, Bucket4j로 IP/계정당 요청 제한 |
 | 🛠 **관리자** | 카테고리 · 상품 · 상품 옵션 · 쿠폰 CRUD |
 | 📁 **파일 업로드** | 상품 이미지 등 파일 업로드 |
-| 🔗 **인증 연동** | `jwt.secret`을 Django `SECRET_KEY`와 공유 — 프론트가 단일 토큰으로 양쪽 서버 호출 |
+| 🔗 **인증** | `jwt.secret`은 Spring Boot가 JWT를 서명·검증하는 전용 값이며, Django `SECRET_KEY`와 공유하지 않음 |
 
 <br/>
 
@@ -93,11 +94,13 @@ Django ↔ Spring 기능 분담 배경은 [`HANDOFF_AUTH_SCOPE.md`](HANDOFF_AUTH
    — 스키마는 Django 마이그레이션이 소유하므로 컨테이너 관리도 그 저장소 쪽에서 합니다.
 2. `src/main/resources/application.yml.example`을 복사해 `application.yml` 생성
    (시크릿 포함 파일이라 git에 없음 — 로컬 컨테이너 자격증명 · 더미 mail/oauth/portone 값이 채워져 있어 바로 동작)
-3. `jwt.secret`은 Django `backend/.env`의 `SECRET_KEY`와 **반드시 같은 값**이어야 토큰이 양쪽에서 호환
-   (example 파일에 이미 그 값이 들어있음)
+3. `jwt.secret`은 Spring Boot 전용 JWT 서명 키이므로 Django `backend/.env`의 `SECRET_KEY`와
+   공유할 필요가 없습니다. `portone.api-secret`은 프론트의 PortOne Store ID·Channel Key와
+   다른 서버 API Secret입니다.
 4. `./mvnw.cmd spring-boot:run`
 
-`./mvnw.cmd test` — MySQL 컨테이너가 떠 있으면 24개 테스트 전부 통과 (`contextLoads` 포함)
+`./mvnw.cmd test` — 단위·통합 테스트를 실행합니다. `WishlistIntegrationTest` 등 MySQL이 필요한
+테스트는 MySQL 컨테이너가 실행 중이어야 합니다.
 
 ## 알려진 상태
 
