@@ -34,6 +34,9 @@ public class Product {
     @Column(name = "base_price")
     private Integer basePrice;
 
+    @Column(name = "original_price")
+    private Integer originalPrice;
+
     @Column(name = "description", columnDefinition = "CLOB")
     private String description;
 
