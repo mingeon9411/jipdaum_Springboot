@@ -120,7 +120,9 @@ public class UserAuthService {
         jipdaumUserRepository.save(newUser);
         List<MyCouponResponse> issuedCoupons = issueWelcomeCoupons(newUser);
 
-        return new RegisterResponse(nickname, email, issuedCoupons);
+        String access = jwtTokenProvider.generateAccessToken(email);
+        String refresh = jwtTokenProvider.generateRefreshToken(email);
+        return new RegisterResponse(nickname, email, issuedCoupons, access, refresh);
     }
 
     /** 가입 완료 직후 웰컴 쿠폰을 계정에 지급하고, 화면에 바로 보여줄 수 있게 지급 내역을 반환한다. */
