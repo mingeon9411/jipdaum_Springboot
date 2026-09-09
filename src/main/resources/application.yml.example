@@ -103,8 +103,8 @@ hcaptcha:
   verify-url: https://hcaptcha.com/siteverify
 
 jwt:
-  # Django SIMPLE_JWT의 SIGNING_KEY(=SECRET_KEY, backend/.env)와 반드시 동일해야 토큰이 양쪽에서 호환된다.
-  secret: '***REMOVED_SECRET***'
+  # Spring Boot 혼자 JWT를 서명·검증하는 데만 쓰는 값 — Django SECRET_KEY와 공유하지 않는다.
+  secret: 여기에_JWT_시크릿_입력
   expiration: 900000
   refresh-expiration: 86400000
 
