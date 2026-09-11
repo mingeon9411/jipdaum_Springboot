@@ -33,6 +33,7 @@ import java.time.Duration;
 public class ChatRateLimitFilter extends OncePerRequestFilter {
 
     private static final String CHAT_PATH = "/api/shop/chat";
+    private static final String SEMANTIC_SEARCH_PATH = "/api/shop/products/semantic-search";
 
     @Value("${app.chat.rate-limit.capacity:10}")
     private int capacity;
@@ -50,7 +51,8 @@ public class ChatRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !(HttpMethod.POST.matches(request.getMethod()) && CHAT_PATH.equals(request.getRequestURI()));
+        return !(HttpMethod.POST.matches(request.getMethod()) && CHAT_PATH.equals(request.getRequestURI()))
+                && !(HttpMethod.GET.matches(request.getMethod()) && SEMANTIC_SEARCH_PATH.equals(request.getRequestURI()));
     }
 
     @Override

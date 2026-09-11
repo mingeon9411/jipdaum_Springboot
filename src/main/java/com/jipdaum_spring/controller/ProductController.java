@@ -2,6 +2,7 @@ package com.jipdaum_spring.controller;
 
 import com.jipdaum_spring.dto.product.CreateReviewRequest;
 import com.jipdaum_spring.service.ProductService;
+import com.jipdaum_spring.service.chat.ProductSearchTool;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,10 +14,16 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductSearchTool productSearchTool;
 
     @GetMapping("/categories")
     public ResponseEntity<?> listCategories() {
         return ResponseEntity.ok(productService.getCategories());
+    }
+
+    @GetMapping("/semantic-search")
+    public ResponseEntity<?> semanticSearch(@RequestParam String q) {
+        return ResponseEntity.ok(productSearchTool.search(q, null, "main"));
     }
 
     // collection("main"/"korean_hall")을 넘기면 그 진열 상품만 필터링해서 돌려준다 — 안 넘기면

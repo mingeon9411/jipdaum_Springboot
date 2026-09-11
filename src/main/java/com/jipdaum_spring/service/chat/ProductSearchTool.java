@@ -59,20 +59,25 @@ public class ProductSearchTool implements ChatTool {
         // (ChatService/GeminiClient의 toolContext 참고).
         String collection = args.get("collection") != null ? args.get("collection").toString() : null;
 
+        List<ProductDetailResponse> products = search(search, categoryId, collection);
+        return new ProductListResult(toModelView(products), products);
+    }
+
+    /** 챗봇과 상품 검색 화면이 같은 의미 검색·키워드 폴백을 사용한다. */
+    public List<ProductDetailResponse> search(String search, Long categoryId, String collection) {
+
         if (StringUtils.hasText(search) && !embeddingIndex.isEmpty()) {
             List<ProductEmbeddingIndex.ProductSummary> semanticResults = semanticSearch(search, categoryId, collection);
             if (!semanticResults.isEmpty()) {
                 List<Long> ids = semanticResults.stream().map(ProductEmbeddingIndex.ProductSummary::id).toList();
-                List<ProductDetailResponse> products = productService.getProductsByIds(ids);
-                return new ProductListResult(toModelView(products), products);
+                return productService.getProductsByIds(ids);
             }
             // 임베딩 검색이 결과를 못 찾으면(질의 임베딩 실패 포함) 아래 키워드 검색으로 폴백한다.
         }
 
-        List<ProductDetailResponse> products = productService.getProducts(search, categoryId, collection).stream()
+        return productService.getProducts(search, categoryId, collection).stream()
                 .limit(MAX_RESULTS)
                 .toList();
-        return new ProductListResult(toModelView(products), products);
     }
 
     // Gemini에게 보낼 요약본 — 토큰/비용 방어를 위해 이름/브랜드/가격/카테고리만 남긴다.
