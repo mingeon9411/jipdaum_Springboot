@@ -82,7 +82,7 @@ Django ↔ Spring 기능 분담은 현재 다음과 같습니다. Django는 관�
 | 🤖 **AI 챗봇** | Gemini 기반 상품 상담 — RAG 임베딩 의미 검색 + 함수 호출로 상품 추천/상세 안내, Bucket4j로 IP/계정당 요청 제한 |
 | 🛠 **관리자** | 카테고리 · 상품 · 상품 옵션 · 쿠폰 CRUD |
 | 📁 **파일 업로드** | 상품 이미지 등 파일 업로드 |
-| 🔗 **인증** | `jwt.secret`은 Spring Boot가 JWT를 서명·검증하는 전용 값이며, Django `SECRET_KEY`와 공유하지 않음 |
+| 🔗 **인증** | `jwt.secret`은 Spring Boot 혼자 JWT를 서명·검증하는 데만 쓰는 값이며, Django `SECRET_KEY`와 공유하지 않음 |
 
 <br/>
 
@@ -94,8 +94,8 @@ Django ↔ Spring 기능 분담은 현재 다음과 같습니다. Django는 관�
    — 스키마는 Django 마이그레이션이 소유하므로 컨테이너 관리도 그 저장소 쪽에서 합니다.
 2. `src/main/resources/application.yml.example`을 복사해 `application.yml` 생성
    (시크릿 포함 파일이라 git에 없음 — 로컬 컨테이너 자격증명 · 더미 mail/oauth/portone 값이 채워져 있어 바로 동작)
-3. `jwt.secret`은 Spring Boot 전용 JWT 서명 키이므로 Django `backend/.env`의 `SECRET_KEY`와
-   공유할 필요가 없습니다. `portone.api-secret`은 프론트의 PortOne Store ID·Channel Key와
+3. `jwt.secret`은 Spring Boot 혼자 JWT를 서명·검증하는 데만 쓰는 값이라 Django `backend/.env`의
+   `SECRET_KEY`와 공유할 필요가 없습니다. `portone.api-secret`은 프론트의 PortOne Store ID·Channel Key와
    다른 서버 API Secret입니다.
 4. `./mvnw.cmd spring-boot:run`
 
@@ -104,5 +104,7 @@ Django ↔ Spring 기능 분담은 현재 다음과 같습니다. Django는 관�
 
 ## 알려진 상태
 
-- `spring.mail`은 더미 SMTP 값이라 실제 이메일 발송은 안 됨 (부팅은 정상)
+- `spring.mail`은 `application.yml.example`의 더미 값으로는 발송이 안 되지만, 로컬에 `EMAIL_HOST_USER`/
+  `EMAIL_HOST_PASSWORD`/`EMAIL_FROM_ADDRESS` 환경변수(네이버 SMTP 계정)를 등록하면 실제 발송됩니다.
+  프로덕션(EC2)에서는 배포 스텝이 같은 이름의 GitHub Secrets를 `docker run -e`로 주입해야 동작합니다.
 - Django와 스키마를 공유하므로 `application.yml`의 `ddl-auto`는 반드시 `none`
